@@ -8,7 +8,7 @@ abstract: |
 
 # Registration
 
-Members of Datateknologsektionen registers themselves in the system on their cell phones or on a terminal placed in the meeting hall.
+Members of Datateknologsektionen registers themselves in the system on their cell phones or on a terminal placed in the meeting hall. The system responds with either "CID not found" or "This is your speaker id: \[Integer\]".
 
 ## Sketch
 
@@ -20,18 +20,36 @@ Members of Datateknologsektionen registers themselves in the system on their cel
     </p>
 
     <p>
-        <label>Speaker id
-            <br><input type="text" />
-        </label>
-    </p>
-
-    <p>
         <input type="submit" value="Register!">
     </p>
 </div>
 
-1. We use the `CID` to get the person's name from Chalmers LDAP.
-1. We use the `Speaker id` to map the user in the system to an integer which is used by the deputee chairman to see who wants to talk.
+The meeting participant then grabs a paper plate or paper and writes the number on that. That token is used during the meeting to identify the participant in the system.
 
-This view is used to register meeting participants in the system, this is the most low tech, but automated solution so far.
+# The meeting view
+
+This view is shown to all meeting participants during the meeting, preferably on a projector or huge tv-monitor. But it won't hurt if it's usable on cellphones.
+
+<div class="example">
+    <h2>§x. Current item on the agenda.</h2>
+    <table>
+        <tr>
+            <td style="vertical-align:top;">
+                <ol>
+                    <li>Bob Bobson</li>
+                    <li>Eric Ericson</li>
+                    <li>Mc Hammer</li>
+                    <li>...</li>
+                </ol>
+            </td>
+
+            <td style="vertical-align:top;">
+                <ol>
+                    <li>Woody Woodpecker</li>
+                    <li>Doland Dcuk</li>
+                </ol>
+            </td>
+        </tr>
+    </table>
+</div>
 
