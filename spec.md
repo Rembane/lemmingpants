@@ -53,3 +53,38 @@ This view is shown to all meeting participants during the meeting, preferably on
     </table>
 </div>
 
+# Manage speakers
+
+<div class="example">
+    <table>
+        <tr>
+            <td style="vertical-align:top;">
+                <p>
+                    <label>CID
+                        <br><input type="text" />
+                    </label>
+                </p>
+
+                <p>
+                    <input type="submit" value="Add to speaker list!">
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="vertical-align:top;">
+                <ol>
+                    <li><a href="">[DEL]</a> Bob Bobson</li>
+                    <li><a href="">[DEL]</a> Eric Ericson</li>
+                    <li><a href="">[DEL]</a> Mc Hammer</li>
+                    <li>...</li>
+                </ol>
+            </td>
+            <td style="vertical-align:top;">
+                <ol>
+                    <li><a href="">[DEL]</a> Woody Woodpecker</li>
+                    <li><a href="">[DEL]</a> Doland Dcuk</li>
+                </ol>
+            </td>
+        </tr>
+    </table>
+</div>
