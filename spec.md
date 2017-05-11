@@ -53,10 +53,19 @@ This view is shown to all meeting participants during the meeting, preferably on
     </table>
 </div>
 
-# Manage speakers
+# Manage meeting
 
 <div class="example">
     <table>
+        <tr>
+            <td style="vertical-align:top;" colspan="2">
+                <h2>
+                <a href="">[PREV]</a>
+                §x. Current item on the agenda.
+                <a href="">[NEXT]</a>
+                </h2>
+            </td>
+        </tr>
         <tr>
             <td style="vertical-align:top;">
                 <p>
