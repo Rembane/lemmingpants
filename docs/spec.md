@@ -55,14 +55,16 @@ This view is shown to all meeting participants during the meeting, preferably on
 
 # Manage meeting
 
+We need to be able to at any time in the meeting interrupt the speaker list and the meeting with an `ordningsfråga` (meta meeting matter), and in the worst case create a new speaker list for this matter. We will model this as a stack, so when an `ordningsfråga` is raised, push a new speaker list to the stack, work with that, and when it is done, pop the stack and go back to the previous speaker list.
+
 <div class="example">
     <table>
         <tr>
             <td style="vertical-align:top;" colspan="2">
                 <h2>
-                <a href="">[PREV]</a>
+                <button>PREVIOUS</button>
                 §x. Current item on the agenda.
-                <a href="">[NEXT]</a>
+                <button>NEXT</button>
                 </h2>
             </td>
         </tr>
@@ -82,18 +84,20 @@ This view is shown to all meeting participants during the meeting, preferably on
         <tr>
             <td style="vertical-align:top;">
                 <ol>
-                    <li><a href="">[DEL]</a> Bob Bobson</li>
-                    <li><a href="">[DEL]</a> Eric Ericson</li>
-                    <li><a href="">[DEL]</a> Mc Hammer</li>
+                    <li><button>DEL</button> Bob Bobson</li>
+                    <li><button>DEL</button> Eric Ericson</li>
+                    <li><button>DEL</button> Mc Hammer</li>
                     <li>...</li>
                 </ol>
             </td>
             <td style="vertical-align:top;">
                 <ol>
-                    <li><a href="">[DEL]</a> Woody Woodpecker</li>
-                    <li><a href="">[DEL]</a> Doland Dcuk</li>
+                    <li><button>DEL</button> Woody Woodpecker</li>
+                    <li><button>DEL</button> Doland Dcuk</li>
                 </ol>
             </td>
         </tr>
     </table>
+
+    <button>New speaker list</button> <button>Delete speaker list</button>
 </div>
