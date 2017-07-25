@@ -83,6 +83,7 @@ We need to be able to at any time in the meeting interrupt the speaker list and 
         </tr>
         <tr>
             <td style="vertical-align:top;">
+                <h2>First</h2>
                 <ol>
                     <li><button>DEL</button> Bob Bobson</li>
                     <li><button>DEL</button> Eric Ericson</li>
@@ -91,6 +92,7 @@ We need to be able to at any time in the meeting interrupt the speaker list and 
                 </ol>
             </td>
             <td style="vertical-align:top;">
+                <h2>Second</h2>
                 <ol>
                     <li><button>DEL</button> Woody Woodpecker</li>
                     <li><button>DEL</button> Doland Dcuk</li>
@@ -99,5 +101,5 @@ We need to be able to at any time in the meeting interrupt the speaker list and 
         </tr>
     </table>
 
-    <button>New speaker list</button> <button>Delete speaker list</button>
+    <button>Push speaker list</button> <button>Pop speaker list</button>
 </div>
