@@ -1,0 +1,3 @@
+# TODO
+
+1. We need our own monad transformer stack for the app preferably involving our own custom error type and MonadThrow, MonadCatch and MonadError and suchlike to make Selda play nice with Servant.
