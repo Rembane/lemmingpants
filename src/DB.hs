@@ -11,7 +11,6 @@ import Control.Error (hush)
 import Control.Monad.Catch (MonadCatch, tryJust)
 import Database.Selda
 import Database.Selda.Backend
-import Database.Selda.SQLite
 
 attendee :: Table (RowID :*: Text)
 attendee =   table "attendee"
@@ -29,16 +28,16 @@ createAttendee cid' = do
 
    where
        getId :: Text -> Query s (Col s RowID)
-       getId cid' = do
-           (id :*: cid) <- select attendee
-           restrict (cid .== text cid')
-           return id
+       getId cid = do
+           (id' :*: cid1) <- select attendee
+           restrict (cid1 .== text cid)
+           return id'
 
        errorHandling :: MonadCatch m => m a -> m (Maybe a)
        errorHandling = fmap hush . tryJust err
            where
                err e@(SqlError _) = Just e
-               err e              = Nothing
+               err _              = Nothing
 
 dbSetup :: SeldaConnection -> IO ()
 dbSetup s = (flip runSeldaT) s $ do
