@@ -24,6 +24,7 @@ import Servant.API
 import Servant.Server
 
 import qualified DB as DB
+import Types
 
 data Config = Config
     { seldaConn :: SeldaConnection
@@ -32,7 +33,11 @@ data Config = Config
 newtype LemmingHandler a = LemmingHandler { runLemmingHandler :: ReaderT Config IO a }
     deriving ( Functor, Applicative, Monad, MonadReader Config )
 
-type LemmingAPI = "attendee" :> "create" :> ReqBody '[JSON] Text :> Post '[JSON] Int
+type LemmingAPI
+  = "attendee" :>
+    (    "create" :> ReqBody '[JSON] Text :> Post '[JSON] Int
+    :<|> "list"   :>                         Get  '[JSON] [Attendee]
+    )
 
 lemmingAPI :: Proxy LemmingAPI
 lemmingAPI = Proxy
@@ -41,17 +46,22 @@ convert :: Config -> LemmingHandler :~> Handler
 convert c = NT (Handler . ExceptT . try . (`runReaderT` c) . runLemmingHandler)
 
 lemmingServerT :: ServerT LemmingAPI LemmingHandler
-lemmingServerT = createAttendee
+lemmingServerT = createAttendee :<|> listAttendees
     where
         createAttendee :: Text -> LemmingHandler Int
-        createAttendee cid = LemmingHandler $ do
+        createAttendee c = LemmingHandler $ do
             conn <- asks seldaConn
-            liftIO (print cid)
-            id' <- runSeldaT (DB.createAttendee cid) conn
-            case id' of
-              Just id'' -> return id''
+            liftIO (print c)
+            i <- runSeldaT (DB.createAttendee c) conn
+            case i of
+              Just i' -> return i'
               Nothing   ->
                   throwM (err409 { errBody = "An attendee with this CID already exists, and it cannot be created again. Talk to the Talhennapresidiet if you have any questions on how to solve this situation." })
+
+        listAttendees :: LemmingHandler [Attendee]
+        listAttendees = LemmingHandler $ do
+            conn <- asks seldaConn
+            runSeldaT (DB.listAttendees) conn
 
 app :: Config -> Application
 app c = serve lemmingAPI ((convert c) `enter` lemmingServerT)

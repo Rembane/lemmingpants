@@ -13,8 +13,9 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     DB, Lib
-  build-depends:       base >= 4.7 && < 5,
+  exposed-modules:     DB, Lib, Types
+  build-depends:       aeson >= 1.1.2.0,
+                       base >= 4.7 && < 5,
                        bytestring >= 0.10.8.1,
                        errors >= 2.2.1,
                        exceptions >= 0.8.3,
