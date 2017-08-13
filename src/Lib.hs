@@ -22,6 +22,7 @@ import Data.Text
 import Database.Selda.Backend
 import Servant.API
 import Servant.Server
+import Servant.Utils.StaticFiles
 
 import qualified DB as DB
 import Types
@@ -38,12 +39,6 @@ type LemmingAPI
     (    "create" :> ReqBody '[JSON] Text :> Post '[JSON] Int
     :<|> "list"   :>                         Get  '[JSON] [Attendee]
     )
-
-lemmingAPI :: Proxy LemmingAPI
-lemmingAPI = Proxy
-
-convert :: Config -> LemmingHandler :~> Handler
-convert c = NT (Handler . ExceptT . try . (`runReaderT` c) . runLemmingHandler)
 
 lemmingServerT :: ServerT LemmingAPI LemmingHandler
 lemmingServerT = createAttendee :<|> listAttendees
@@ -63,5 +58,19 @@ lemmingServerT = createAttendee :<|> listAttendees
             conn <- asks seldaConn
             runSeldaT (DB.listAttendees) conn
 
+type WithStaticFilesAPI
+  =    LemmingAPI
+  :<|> Raw -- Static files
+
+lemmingAPI :: Proxy LemmingAPI
+lemmingAPI = Proxy
+
+withStaticFilesAPI :: Proxy WithStaticFilesAPI
+withStaticFilesAPI = Proxy
+
 app :: Config -> Application
-app c = serve lemmingAPI ((convert c) `enter` lemmingServerT)
+app c = serve withStaticFilesAPI (((convert c) `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
+    where
+        convert :: Config -> LemmingHandler :~> Handler
+        convert c = NT (Handler . ExceptT . try . (`runReaderT` c) . runLemmingHandler)
+
