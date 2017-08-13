@@ -1,15 +1,28 @@
 'use strict';
 
+import m from 'mithril';
+import Agenda from './Agenda';
+
+var AgendaComponent = {
+    oninit: Agenda.init,
+    view: function() {
+        if(Agenda.agenda) {
+            return m('h2', [
+                m('button', { onclick: function() { Agenda.decCurrent(); } }, '|<'),
+                m.trust('&sect;'),
+                (Agenda.current + 1) + '. ',
+                Agenda.getCurrent().title,
+                m('button', { onclick: function() { Agenda.incCurrent(); } }, '>|')
+            ]);
+        }
+    }
+}
+
 var MeetingAdmin = {
     view: function() {
         return m('div', [
             m('section', [
-                m('h2', [
-                    m('button', 'PREVIOUS'),
-                    '§x. Current item on the agenda.',
-                    m('button', 'NEXT'),
-
-                ]),
+                m(AgendaComponent)
             ]),
             m('section', [
                 m('p', [

@@ -1,7 +1,7 @@
 name:                lemmingpants
 version:             0.1.0.0
 homepage:            https://github.com/Rembane/lemmingpants#readme
-license:             Apache
+license:             Apache-2.0
 license-file:        LICENSE
 author:              Andreas Ekeroot
 maintainer:          ekeroot@student.chalmers.se

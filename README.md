@@ -8,6 +8,26 @@ The name is much inspired by DHack's totem animal, the [lemming](https://www.you
 
 ## Installation
 
-The package is built using nix and cabal. Building it with stack might work, but it is not guaranteed, please file an issue if you have any problem building this package.
+The package is built using either stack or nix and cabal. Please file an issue if you have any problem building this package.
 
-Build guide coming soon...
+### stack
+
+```bash
+stack install
+```
+
+### nix + cabal
+
+This is a nice command for starting the nix shell. In the shell you can run `cabal build` and `cabal install` as usual.
+
+```bash
+nix-shell --attr env release0.nix
+```
+
+When you change anything in the cabal file, run this command:
+
+```bash
+cabal2nix . > default.nix
+```
+
+TODO: More build guide for nix!

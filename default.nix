@@ -1,6 +1,6 @@
-{ mkDerivation, base, bytestring, errors, exceptions, http-media
-, selda, selda-sqlite, servant, servant-server, stdenv, text, time
-, wai, wai-logger, warp
+{ mkDerivation, aeson, base, bytestring, errors, exceptions
+, http-media, mtl, selda, selda-sqlite, servant, servant-server
+, stdenv, text, time, wai, wai-logger, warp
 }:
 mkDerivation {
   pname = "lemmingpants";
@@ -9,11 +9,11 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base bytestring errors exceptions http-media selda selda-sqlite
-    servant servant-server text time
+    aeson base bytestring errors exceptions http-media mtl selda
+    selda-sqlite servant servant-server text time
   ];
   executableHaskellDepends = [
-    base servant servant-server wai wai-logger warp
+    base selda-sqlite servant servant-server wai wai-logger warp
   ];
   testHaskellDepends = [ base ];
   homepage = "https://github.com/Rembane/lemmingpants#readme";
