@@ -10,6 +10,17 @@ The name is much inspired by DHack's totem animal, the [lemming](https://www.you
 
 The package is built using either stack or nix and cabal. Please file an issue if you have any problem building this package.
 
+### Always run these
+
+We need to install some Javascript stuff. Do that by running these commands in sequence:
+
+```bash
+npm install
+./build_javascript.sh
+```
+
+And then everything regarding Javascript should work, if it doesn't, file an issue!
+
 ### stack
 
 ```bash
