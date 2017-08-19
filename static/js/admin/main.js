@@ -2,11 +2,13 @@
 
 import m from 'mithril';
 import Agenda from './Agenda';
+import AttendeeList from './AttendeeList';
 
 var AgendaComponent = {
     oninit: Agenda.init,
     view: function() {
-        if(Agenda.agenda) {
+        if(Agenda.agenda !== null && Agenda.agenda.length > 0) {
+            console.log(Agenda.agenda);
             return m('h2', [
                 m('button', { onclick: function() { Agenda.decCurrent(); } }, '|<'),
                 m.trust('&sect;'),
@@ -14,7 +16,17 @@ var AgendaComponent = {
                 Agenda.getCurrent().title,
                 m('button', { onclick: function() { Agenda.incCurrent(); } }, '>|')
             ]);
+        } else {
+            return m('p[class=error]', 'There is no agenda... please load one or reload the page.');
         }
+    }
+}
+
+var AttendeeListComponent = {
+    visible: false,
+    oninit: AttendeeList.init,
+    view: function() {
+        return m(':D');
     }
 }
 
@@ -25,6 +37,10 @@ var MeetingAdmin = {
                 m(AgendaComponent)
             ]),
             m('section', [
+                m(AttendeeListComponent),
+                m('p', [
+                    m('a[href=""]', { onclick: function() {  } }, 'Show list of attendees.')
+                ]),
                 m('p', [
                     m('label', [
                         'Number',
