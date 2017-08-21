@@ -14,6 +14,8 @@ var AgendaComponent = {
                 Agenda.getCurrent().title,
                 m('button', { onclick: function() { Agenda.incCurrent(); } }, '>|')
             ]);
+        } else {
+            return m('p[class=error]', 'There is no agenda... please load one or reload the page.');
         }
     }
 }
