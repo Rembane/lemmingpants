@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Lib
@@ -13,26 +15,29 @@ module Lib
     , DB.dbSetup
     ) where
 
+import Data.Aeson (encode)
 import qualified Data.ByteString.Lazy.Char8 as BL
+import Control.Concurrent.STM.TChan
+import Control.Monad
 import Control.Monad.Except (ExceptT(..))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader
 import Control.Monad.Catch (throwM, try)
+import Control.Monad.STM
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Text
+import Database.Selda (RowID, fromRowId)
 import Database.Selda.Backend
 import Database.Selda.Unsafe (unsafeRowId)
+import Network.Wai.Handler.WebSockets (websocketsOr)
+import qualified Network.WebSockets as WS
 import Servant.API
 import Servant.Server
 import Servant.Utils.StaticFiles
 
 import qualified DB as DB
 import Types
-
-data Config = Config
-    { seldaConn :: SeldaConnection
-    }
 
 newtype LemmingHandler a = LemmingHandler { runLemmingHandler :: ReaderT Config IO a }
     deriving ( Functor, Applicative, Monad, MonadReader Config )
@@ -58,11 +63,10 @@ lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> li
         createAttendee c = LemmingHandler $ do
             conn <- asks seldaConn
             liftIO (print c)
-            i <- runSeldaT (DB.createAttendee c) conn
-            case i of
-              Just i' -> return i'
-              Nothing   ->
-                  throwM (err409 { errBody = "An attendee with this CID already exists, and it cannot be created again. Talk to the Talhennapresidiet if you have any questions on how to solve this situation." })
+            a <- runSeldaT (DB.createAttendee c) conn
+            wch <- asks msgChan
+            liftIO $ atomically $ writeTChan wch (Notify (encode a))
+            return (fromRowId $ (Types.id :: Attendee -> RowID) a)
 
         listAttendees :: LemmingHandler [Attendee]
         listAttendees = LemmingHandler $ do
@@ -92,8 +96,26 @@ lemmingAPI = Proxy
 withStaticFilesAPI :: Proxy WithStaticFilesAPI
 withStaticFilesAPI = Proxy
 
+handleWS :: Config -> WS.PendingConnection -> IO ()
+handleWS conf req = do
+    conn <- WS.acceptRequest req
+    WS.forkPingThread conn 30
+    as <- runSeldaT (DB.listAttendees) (seldaConn conf)
+    WS.sendTextData conn (encode as)
+    ch <- atomically $ dupTChan (msgChan conf)
+    forever $ do
+        msg <- atomically $ readTChan ch
+        case msg of
+          Notify m -> WS.sendTextData conn m
+
 app :: Config -> Application
-app c = serve withStaticFilesAPI (((convert c) `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
+app conf = websocketsOr
+            WS.defaultConnectionOptions
+            (handleWS conf)
+            (serve
+                withStaticFilesAPI
+                (((convert conf) `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
+            )
     where
         convert :: Config -> LemmingHandler :~> Handler
         convert c = NT (Handler . ExceptT . try . (`runReaderT` c) . runLemmingHandler)

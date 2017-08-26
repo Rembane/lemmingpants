@@ -2,23 +2,39 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GADTs #-}
 
 module Types
     ( AgendaItem(..)
     , Attendee(..)
+    , Config(..)
+    , MessageType(..)
     ) where
 
+import Control.Concurrent.STM.TChan (TChan)
 import Data.Aeson
 import Data.Monoid
 import Data.Text
 import Database.Selda
+import Database.Selda.Backend (SeldaConnection)
 import GHC.Generics hiding ((:*:))
+import qualified Network.WebSockets as WS
+
+-- | Internal stuff for message passing.
+data MessageType where
+    Notify    :: WS.WebSocketsData a => a -> MessageType
+
+-- | Configuration
+data Config = Config
+    { seldaConn :: SeldaConnection
+    , msgChan   :: TChan MessageType
+    }
 
 -- Id, CID
 data Attendee = Attendee
     { id :: RowID
     , cid :: Text
-    } deriving Generic
+    } deriving (Generic, Show)
 
 -- This is quite boilerplaty, we'll take care of it later.
 instance ToJSON Attendee where
