@@ -1,5 +1,7 @@
 'use strict';
 
+import m from 'mithril';
+
 var number = '';
 var cid    = '';
 var postCID = function() {
