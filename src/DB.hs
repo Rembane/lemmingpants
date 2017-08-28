@@ -27,7 +27,7 @@ attendee = genTable "attendee" [(id :: Attendee -> RowID) :- autoPrimaryGen, cid
 -- | Creates and attendee with CID: cid' and returns the attendee.
 createAttendee :: (MonadCatch m, MonadIO m) => Text -> SeldaT m Attendee
 createAttendee cid' = do
-    insert_ (gen attendee) [ def :*: cid' ]
+    tryInsert (gen attendee) [ def :*: cid' ]
     fmap (fromRel . head) $ query $ do
         a@(_ :*: c) <- select (gen attendee)
         restrict (c .== text cid')
