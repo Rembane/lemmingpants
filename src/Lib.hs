@@ -12,12 +12,12 @@
 module Lib
     ( app
     , Config(..)
-    , DB.dbSetup
     ) where
 
 import Data.Aeson (encode)
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Control.Concurrent.STM.TChan
+import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.Except (ExceptT(..))
 import Control.Monad.IO.Class (liftIO)
@@ -27,17 +27,21 @@ import Control.Monad.STM
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Text
-import Database.Selda (RowID, fromRowId)
-import Database.Selda.Backend
-import Database.Selda.Unsafe (unsafeRowId)
 import Network.Wai.Handler.WebSockets (websocketsOr)
 import qualified Network.WebSockets as WS
+import Prelude hiding (id)
 import Servant.API
 import Servant.Server
 import Servant.Utils.StaticFiles
 
 import qualified DB as DB
 import Types
+
+-- | Configuration
+data Config = Config
+    { db      :: TVar DB.Database
+    , msgChan :: TChan MessageType
+    }
 
 newtype LemmingHandler a = LemmingHandler { runLemmingHandler :: ReaderT Config IO a }
     deriving ( Functor, Applicative, Monad, MonadReader Config )
@@ -61,30 +65,30 @@ lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> li
     where
         createAttendee :: Text -> LemmingHandler Int
         createAttendee c = LemmingHandler $ do
-            conn <- asks seldaConn
-            liftIO (print c)
-            a <- runSeldaT (DB.createAttendee c) conn
+            db' <- asks db
+            a   <- liftIO $ atomically $ DB.createAttendee c db'
+            liftIO (print (c, a))
             wch <- asks msgChan
             liftIO $ atomically $ writeTChan wch (Notify (encode a))
-            return (fromRowId $ (Types.id :: Attendee -> RowID) a)
+            return $ (id :: Attendee -> Int) a
 
         listAttendees :: LemmingHandler [Attendee]
         listAttendees = LemmingHandler $ do
-            conn <- asks seldaConn
-            runSeldaT (DB.listAttendees) conn
+            db' <- asks db
+            liftIO $ atomically $ DB.listAttendees db'
 
         getAgendaItem :: Int -> LemmingHandler AgendaItem
         getAgendaItem i = LemmingHandler $ do
-            conn <- asks seldaConn
-            r <- runSeldaT (DB.getAgendaItem (unsafeRowId i)) conn
+            db' <- asks db
+            r   <- liftIO $ atomically $ DB.getAgendaItem i db'
             case r of
               Just r' -> return r'
               Nothing -> throwM (err404 { errBody = "An agenda item with id: " <> BL.pack (show i) <> " doesn't exist!" })
 
         listAgendaItems :: LemmingHandler [AgendaItem]
         listAgendaItems = LemmingHandler $ do
-            conn <- asks seldaConn
-            runSeldaT (DB.listAgendaItems) conn
+            db' <- asks db
+            liftIO $ atomically $ DB.listAgendaItems db'
 
 type WithStaticFilesAPI
   =    LemmingAPI
@@ -100,7 +104,7 @@ handleWS :: Config -> WS.PendingConnection -> IO ()
 handleWS conf req = do
     conn <- WS.acceptRequest req
     WS.forkPingThread conn 30
-    as <- runSeldaT (DB.listAttendees) (seldaConn conf)
+    as <- liftIO $ atomically $ DB.listAttendees $ db conf
     WS.sendTextData conn (encode as)
     ch <- atomically $ dupTChan (msgChan conf)
     forever $ do
