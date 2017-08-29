@@ -1,12 +1,10 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Lib
@@ -34,7 +32,7 @@ import Servant.API
 import Servant.Server
 import Servant.Utils.StaticFiles
 
-import qualified DB as DB
+import qualified DB
 import Types
 
 -- | Configuration
@@ -118,7 +116,7 @@ app conf = websocketsOr
             (handleWS conf)
             (serve
                 withStaticFilesAPI
-                (((convert conf) `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
+                ((convert conf `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
             )
     where
         convert :: Config -> LemmingHandler :~> Handler

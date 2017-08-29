@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GADTs #-}
 
@@ -32,7 +31,7 @@ data Attendee = Attendee
     , cid :: Text
     } deriving (Generic, Show, Serialize, ToJSON)
 
-data SpeakerQueue = SpeakerQueue
+newtype SpeakerQueue = SpeakerQueue
     { speakers :: V.Vector Attendee }
     deriving (Generic, Serialize, ToJSON)
 
