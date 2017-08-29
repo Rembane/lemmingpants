@@ -1,23 +1,43 @@
 module Main where
 
 import Control.Concurrent.STM.TChan (newBroadcastTChanIO)
+import Control.Concurrent.STM.TVar (newTVarIO)
 import Control.Exception (bracket)
-import Database.Selda.SQLite (seldaClose, sqliteOpen)
 import Network.Wai.Logger
 import Network.Wai.Handler.Warp
+import System.Directory
 
 import Lib
+import qualified DB
+
+dbFilename :: String
+dbFilename = "lemmingpants.db"
+
+-- | Dies horribly if database can't be loaded.
+loadOrDie :: IO DB.Database
+loadOrDie = do
+    exists <- doesFileExist dbFilename
+    if exists
+       then do
+            db <- DB.load dbFilename
+            case db of
+              Left  s   -> error s
+              Right db' -> return db'
+       else
+            return DB.empty
 
 main :: IO ()
 main = bracket
-    ( (,) <$> sqliteOpen "datalemming.db"
-          <*> newBroadcastTChanIO
+    ( do
+        db <- loadOrDie
+        v1 <- newTVarIO db
+        v2 <- newBroadcastTChanIO
+        return (v1, v2)
     )
-    ( seldaClose . fst )
+    ( DB.save dbFilename . fst)
     ( \(db, bcChan) -> do
         putStrLn "\nInitializing..."
         putStrLn "Running..."
-        dbSetup db
         withStdoutLogger $ \aplogger ->
             runSettings
                 (setPort 8000 $ setLogger aplogger defaultSettings)

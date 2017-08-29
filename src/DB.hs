@@ -1,67 +1,75 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
 module DB
-    ( attendee
+    ( Database
+    , empty
+    , save
+    , load
     , createAttendee
     , listAttendees
-    , agendaItem
     , getAgendaItem
     , listAgendaItems
-    , dbSetup
     ) where
 
-import Control.Monad.Catch (MonadCatch)
-import Data.Maybe (listToMaybe)
-import Database.Selda
-import Database.Selda.Backend
-import Database.Selda.Generic
-import Prelude hiding (id)
+import qualified Data.ByteString as B
+import Control.Concurrent.STM.TVar
+import Control.Monad.STM
+import Data.Serialize (Serialize, decode, encode)
+import Data.Vector.Serialize ()
+import Data.Serialize.Text ()
+import Data.Text hiding (empty)
+import qualified Data.Map.Strict as M
+import qualified Data.Vector as V
+import GHC.Generics (Generic)
 
 import Types
 
-attendee :: GenTable Attendee
-attendee = genTable "attendee" [(id :: Attendee -> RowID) :- autoPrimaryGen, cid :- uniqueGen]
+data Database = Database
+    { attendees     :: M.Map Text Attendee -- ^ Search by CID.
+    , attendeeIndex :: Int
+    , agenda        :: V.Vector AgendaItem
+    } deriving (Generic)
 
--- | Creates and attendee with CID: cid' and returns the attendee.
-createAttendee :: (MonadCatch m, MonadIO m) => Text -> SeldaT m Attendee
-createAttendee cid' = do
-    tryInsert (gen attendee) [ def :*: cid' ]
-    fmap (fromRel . head) $ query $ do
-        a@(_ :*: c) <- select (gen attendee)
-        restrict (c .== text cid')
-        return a
+instance Serialize Database
 
-listAttendees :: (MonadCatch m, MonadIO m) => SeldaT m [Attendee]
-listAttendees = fromRels <$> query (select (gen attendee))
+empty :: Database
+empty = Database
+    { attendees     = M.empty
+    , attendeeIndex = 1
+    , agenda        = V.empty
+    }
 
--- --------------------------------------------------------------------------
+-- | Save database to disk.
+save :: String -> TVar Database -> IO ()
+save fn db = (B.writeFile fn . encode) =<< readTVarIO db
 
-agendaItem :: GenTable AgendaItem
-agendaItem = genTable "agendaItem" [(id :: (AgendaItem -> RowID)) :- autoPrimaryGen, title :- uniqueGen]
+-- | Load database from disk.
+load :: String -> IO (Either String Database)
+load = (fmap . fmap) decode B.readFile
 
--- | Gets one agenda item with the corresponding id or Nothing if it doesn't correspond.
-getAgendaItem :: (MonadCatch m, MonadIO m) => RowID -> SeldaT m (Maybe AgendaItem)
-getAgendaItem i' = do
-    as' <- query $ do
-        as@(i :*: _) <- select (gen agendaItem)
-        restrict (literal i' .== i)
-        return as
-    return $ listToMaybe $ fromRels $ as'
+-- | Creates an attendee and puts it in the database.
+-- If the attendee already exists, return it instead.
+-- Takes a CID as first argument.
+createAttendee :: Text -> TVar Database -> STM Attendee
+createAttendee cid db = do
+    db' <- readTVar db
+    case M.lookup cid (attendees db') of
+      Nothing -> let n = 1 + attendeeIndex db'
+                     a = Attendee n cid
+                  in writeTVar db (db' { attendeeIndex = n, attendees = M.insert cid a (attendees db') }) >> return a
+      Just a  -> return a
 
--- | Gets all agenda items ordered by order.
-listAgendaItems :: (MonadCatch m, MonadIO m) => SeldaT m [AgendaItem]
-listAgendaItems = do
-    as' <- query $ do
-        as@(_ :*: _ :*: _ :*: o) <- select (gen agendaItem)
-        Database.Selda.order o ascending
-        return as
-    return $ fromRels as'
+-- | Returns a list of all attendees in arbitrary order.
+listAttendees :: TVar Database -> STM [Attendee]
+listAttendees db = M.elems . attendees <$> readTVar db
 
--- --------------------------------------------------------------------------
+-- | Get an agenda item by id.
+getAgendaItem :: Int -> TVar Database -> STM (Maybe AgendaItem)
+getAgendaItem id' db = (V.!? id') . agenda <$> readTVar db
 
-dbSetup :: SeldaConnection -> IO ()
-dbSetup s = (flip runSeldaT) s $ do
-    tryCreateTable (gen attendee)
-    tryCreateTable (gen agendaItem)
+-- | List agenda items.
+listAgendaItems :: TVar Database -> STM [AgendaItem]
+listAgendaItems db = V.toList . agenda <$> readTVar db
