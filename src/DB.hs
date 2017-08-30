@@ -8,8 +8,12 @@ module DB
     , empty
     , save
     , load
+    , loadOrDie
+
     , createAttendee
     , listAttendees
+
+    , createAgendaItem
     , getAgendaItem
     , listAgendaItems
     ) where
@@ -24,6 +28,7 @@ import Data.Text hiding (empty)
 import qualified Data.Map.Strict as M
 import qualified Data.Vector as V
 import GHC.Generics (Generic)
+import System.Directory (doesFileExist)
 
 import Types
 
@@ -31,6 +36,7 @@ data Database = Database
     { attendees     :: M.Map Text Attendee -- ^ Search by CID.
     , attendeeIndex :: Int
     , agenda        :: V.Vector AgendaItem
+    , agendaIIndex  :: Int
     } deriving (Generic)
 
 instance Serialize Database
@@ -40,6 +46,7 @@ empty = Database
     { attendees     = M.empty
     , attendeeIndex = 1
     , agenda        = V.empty
+    , agendaIIndex  = 1
     }
 
 -- | Save database to disk.
@@ -49,6 +56,19 @@ save fn db = (B.writeFile fn . encode) =<< readTVarIO db
 -- | Load database from disk.
 load :: String -> IO (Either String Database)
 load = (fmap . fmap) decode B.readFile
+
+-- | Dies horribly if database can't be loaded.
+loadOrDie :: String -> IO DB.Database
+loadOrDie fn = do
+    exists <- doesFileExist fn
+    if exists
+       then do
+            db <- DB.load fn
+            case db of
+              Left  s   -> error s
+              Right db' -> return db'
+       else
+            return DB.empty
 
 -- | Creates an attendee and puts it in the database.
 -- If the attendee already exists, return it instead.
@@ -65,6 +85,20 @@ createAttendee cid db = do
 -- | Returns a list of all attendees in arbitrary order.
 listAttendees :: TVar Database -> STM [Attendee]
 listAttendees db = M.elems . attendees <$> readTVar db
+
+-- | Create an item on the agenda.
+createAgendaItem :: Text -> Text -> TVar Database -> STM AgendaItem
+createAgendaItem t c db = do
+    db' <- readTVar db
+    let n = 1 + agendaIIndex db'
+        a = AgendaItem
+            { id                = n
+            , title             = t
+            , content           = c
+            , speakerQueueStack = []
+            }
+     in writeTVar db (db' { agendaIIndex = n, agenda = V.snoc (agenda db') a }) >> return a
+
 
 -- | Get an agenda item by id.
 getAgendaItem :: Int -> TVar Database -> STM (Maybe AgendaItem)
