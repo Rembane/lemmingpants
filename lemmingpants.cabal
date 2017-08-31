@@ -65,7 +65,7 @@ executable lemmingpants-import-agenda
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base,
                        lemmingpants,
-                       megaparsec >= 5.3.1,
+                       megaparsec >= 5.3.1 && < 6,
                        stm,
                        text
   default-language:    Haskell2010
