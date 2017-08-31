@@ -26,6 +26,7 @@ import Control.Monad.STM
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Text
+import Data.UUID (UUID)
 import Network.Wai.Handler.WebSockets (websocketsOr)
 import qualified Network.WebSockets as WS
 import Prelude hiding (id)
@@ -54,8 +55,8 @@ type LemmingAPI
       )
   :<|>
       ( "agendaitem" :>
-          (    "get"  :> ReqBody '[JSON] Int :> Get '[JSON] AgendaItem
-          :<|> "list" :>                        Get '[JSON] [AgendaItem]
+          (    "get"              :> ReqBody '[JSON] UUID :> Get  '[JSON] AgendaItem
+          :<|> "list"             :>                         Get  '[JSON] [AgendaItem]
           )
       )
 
@@ -76,13 +77,13 @@ lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> li
             db' <- asks db
             liftIO $ atomically $ DB.listAttendees db'
 
-        getAgendaItem :: Int -> LemmingHandler AgendaItem
-        getAgendaItem i = LemmingHandler $ do
+        getAgendaItem :: UUID -> LemmingHandler AgendaItem
+        getAgendaItem uuid = LemmingHandler $ do
             db' <- asks db
-            r   <- liftIO $ atomically $ DB.getAgendaItem i db'
+            r   <- liftIO $ atomically $ DB.getAgendaItem uuid db'
             case r of
               Just r' -> return r'
-              Nothing -> throwM (err404 { errBody = "An agenda item with id: " <> BL.pack (show i) <> " doesn't exist!" })
+              Nothing -> throwM (err404 { errBody = "There is no item on the agenda with uuid: " <> BL.pack (show uuid) })
 
         listAgendaItems :: LemmingHandler [AgendaItem]
         listAgendaItems = LemmingHandler $ do

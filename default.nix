@@ -1,6 +1,7 @@
-{ mkDerivation, aeson, base, bytestring, errors, exceptions
-, http-media, mtl, selda, selda-sqlite, servant, servant-server
-, stdenv, stm, text, time, wai, wai-logger, wai-websockets, warp
+{ mkDerivation, aeson, base, bytestring, cereal, cereal-text
+, cereal-vector, containers, directory, errors, exceptions
+, http-media, megaparsec, mtl, servant, servant-server, stdenv, stm
+, text, time, uuid, vector, wai, wai-logger, wai-websockets, warp
 , websockets
 }:
 mkDerivation {
@@ -10,12 +11,13 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    aeson base bytestring errors exceptions http-media mtl selda
-    selda-sqlite servant servant-server stm text time wai-websockets
-    websockets
+    aeson base bytestring cereal cereal-text cereal-vector containers
+    directory errors exceptions http-media mtl servant servant-server
+    stm text time uuid vector wai-websockets websockets
   ];
   executableHaskellDepends = [
-    base selda-sqlite servant servant-server stm wai wai-logger warp
+    base megaparsec servant servant-server stm text uuid wai wai-logger
+    warp
   ];
   testHaskellDepends = [ base ];
   homepage = "https://github.com/Rembane/lemmingpants#readme";

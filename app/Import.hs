@@ -6,8 +6,10 @@ import Control.Concurrent.STM.TVar (newTVarIO)
 import Control.Exception (bracket)
 import Control.Monad
 import Control.Monad.STM (atomically)
+import Data.List (zip3)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
+import Data.UUID.V4 (nextRandom)
 import System.Environment (getArgs)
 import Text.Megaparsec
 
@@ -39,6 +41,7 @@ main = do
                     ( DB.save dbFilename )
                     ( \db -> do
                         putStrLn "Running with database..."
-                        atomically $ mapM_ (\v -> DB.createAgendaItem (T.pack v) "" db) vs
+                        uuids <- sequence (repeat nextRandom)
+                        atomically $ mapM_ (\(uuid, o, v) -> DB.createAgendaItem uuid o (T.pack v) "" db) (zip3 uuids [1..] vs)
                     )
 
