@@ -7,40 +7,52 @@ import AttendeeList from './AttendeeList';
 var AgendaComponent = {
     oninit: Agenda.init,
     view: function() {
-        if(Agenda.agenda !== null && Agenda.agenda.length > 0) {
-            console.log(Agenda.agenda);
-            return m('h2', [
-                m('button', { onclick: function() { Agenda.decCurrent(); } }, '|<'),
-                m.trust('&sect;'),
-                (Agenda.current + 1) + '. ',
-                Agenda.getCurrent().title,
-                m('button', { onclick: function() { Agenda.incCurrent(); } }, '>|')
+        try {
+            return m('section', [
+                m('h2', [
+                    m('button', { onclick: function() { Agenda.decCurrent(); } }, '|<'),
+                    m.trust('&sect;'),
+                    (Agenda.current + 1) + '. ',
+                    Agenda.getCurrent().title,
+                    m('button', { onclick: function() { Agenda.incCurrent(); } }, '>|')
+                ])
             ]);
-        } else {
-            return m('p[class=error]', 'There is no agenda... please load one or reload the page.');
+        } catch(e) {
+            if(e.name === 'NotLoadedYetException') {
+                return '';
+            } else {
+                throw e;
+            }
         }
     }
 }
 
 var AttendeeListComponent = {
     visible: false,
-    oninit: AttendeeList.init,
+    //oninit: AttendeeList.init,
     view: function() {
-        return m(':D');
+        return m('section', [
+            m('p', [
+                m('a[href=""]', { onclick: function() {  } }, 'Show list of attendees.')
+            ])
+        ]);
     }
 }
 
-var MeetingAdmin = {
+var SpeakerQueueStackComponent = {
     view: function() {
-        return m('div', [
-            m('section', [
-                m(AgendaComponent)
-            ]),
-            m('section', [
-                m(AttendeeListComponent),
-                m('p', [
-                    m('a[href=""]', { onclick: function() {  } }, 'Show list of attendees.')
-                ]),
+        try {
+            return m('section', [
+                m('h1', 'Speakers'),
+                m('ol', Agenda.getCurrent()['speakerQueueStack'].list().map(function(a) {
+                    return m('li', [
+                        m('button', 'DEL'),
+                        a
+                    ]);
+                })),
+                m('p', ['Speaker stack height: ', Agenda.getCurrent()['speakerQueueStack'].stackHeight()]),
+                m('button', { onclick: function() { Agenda.getCurrent()['speakerQueueStack'].push(); } }, 'Push speaker queue'),
+                m('button', 'Pop speaker queue'),
                 m('p', [
                     m('label', [
                         'Number',
@@ -51,42 +63,24 @@ var MeetingAdmin = {
                 m('p', [
                     m('input', { type: 'submit', value: 'Add to speaker list!' })
                 ])
-            ]),
-            m('section', [
-                m('h2', 'First'),
-                m('ol', [
-                    m('li', [
-                        m('button', 'DEL'),
-                        'Bob Bobson'
-                    ]),
-                    m('li', [
-                        m('button', 'DEL'),
-                        'Eric Ericson'
-                    ]),
-                    m('li', [
-                        m('button', 'DEL'),
-                        'Mc Hammer'
-                    ]),
-                ])
-            ]),
-            m('section', [
-                m('h2', 'Second'),
-                m('ol', [
-                    m('li', [
-                        m('button', 'DEL'),
-                        'Woody Woodpecker'
-                    ]),
-                    m('li', [
-                        m('button', 'DEL'),
-                        'Doland Dcuk'
-                    ]),
-                ])
-            ]),
-            m('section', [
-                m('button', 'Push speaker list'),
-                m('button', 'Pop speaker list'),
-            ])
-        ]);
+            ]);
+        } catch(e) {
+            if(e.name === 'NotLoadedYetException') {
+                return '';
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+
+var MeetingAdmin = {
+    view: function() {
+        return [
+            m(AgendaComponent),
+            m(AttendeeListComponent),
+            m(SpeakerQueueStackComponent)
+        ];
     }
 };
 m.mount(document.body, MeetingAdmin);

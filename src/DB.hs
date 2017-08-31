@@ -15,14 +15,10 @@ module DB
 
     , createAgendaItem
     , getAgendaItem
+    , modifyAgendaItem
     , listAgendaItems
 
-{-
     , pushSpeakerQueue
-    , popSpeakerQueue
-    , enqueueSpeaker
-    , dequeueSpeaker
-    -}
     ) where
 
 import qualified Data.ByteString as B
@@ -32,10 +28,11 @@ import Data.Function (on)
 import qualified Data.Map.Strict as M
 import Data.List (sortBy)
 import Data.Serialize (Serialize, decode, encode)
-import Data.Vector.Serialize ()
 import Data.Serialize.Text ()
 import qualified Data.Text as T
 import Data.UUID (UUID)
+import qualified Data.Vector as V
+import Data.Vector.Serialize ()
 import GHC.Generics (Generic)
 import System.Directory (doesFileExist)
 
@@ -103,7 +100,7 @@ createAgendaItem uuid o t c db = readTVar db >>= go
                { id                = uuid
                , title             = t
                , content           = c
-               , speakerQueueStack = []
+               , speakerQueueStack = [SpeakerQueue V.empty]
                , order             = o
                }
 
@@ -115,3 +112,18 @@ getAgendaItem uuid db = M.lookup uuid . agenda <$> readTVar db
 listAgendaItems :: TVar Database -> STM [AgendaItem]
 listAgendaItems db = sortBy (compare `on` order) . Prelude.map snd . M.toList . agenda <$> readTVar db
 
+-- | Modify an agenda item using a higher order function.
+-- Returns Nothing if the agenda item couldn't be found.
+modifyAgendaItem :: (AgendaItem -> AgendaItem) -> UUID -> TVar Database -> STM (Maybe AgendaItem)
+modifyAgendaItem f uuid db = do
+    a <- (fmap . fmap) f (getAgendaItem uuid db)
+    case a of
+      Nothing -> return Nothing
+      Just a' -> do
+          db' <- readTVar db
+          writeTVar db (db' { agenda = M.insert uuid a' (agenda db')})
+          return (Just a')
+
+-- | Push a speakerqueue onto the speakerQueueStack.
+pushSpeakerQueue :: UUID -> TVar Database -> STM (Maybe AgendaItem)
+pushSpeakerQueue = modifyAgendaItem (\a -> a { speakerQueueStack = (SpeakerQueue V.empty) : speakerQueueStack a })

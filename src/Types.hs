@@ -8,6 +8,7 @@ module Types
     ( AgendaItem(..)
     , Attendee(..)
     , MessageType(..)
+    , SpeakerQueue(..)
     ) where
 
 import Control.Concurrent.STM.TChan (TChan)

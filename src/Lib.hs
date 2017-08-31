@@ -57,11 +57,12 @@ type LemmingAPI
       ( "agendaitem" :>
           (    "get"              :> ReqBody '[JSON] UUID :> Get  '[JSON] AgendaItem
           :<|> "list"             :>                         Get  '[JSON] [AgendaItem]
+          :<|> "pushSpeakerQueue" :> ReqBody '[JSON] UUID :> Post '[JSON] [SpeakerQueue]
           )
       )
 
 lemmingServerT :: ServerT LemmingAPI LemmingHandler
-lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> listAgendaItems)
+lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> listAgendaItems :<|> pushSpeakerQueue)
     where
         createAttendee :: Text -> LemmingHandler Int
         createAttendee c = LemmingHandler $ do
@@ -89,6 +90,14 @@ lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> li
         listAgendaItems = LemmingHandler $ do
             db' <- asks db
             liftIO $ atomically $ DB.listAgendaItems db'
+
+        pushSpeakerQueue :: UUID -> LemmingHandler [SpeakerQueue]
+        pushSpeakerQueue uuid = LemmingHandler $ do
+            db' <- asks db
+            r   <- liftIO $ atomically $ DB.pushSpeakerQueue uuid db'
+            case r of
+              Just r' -> return (speakerQueueStack r')
+              Nothing -> throwM (err404 { errBody = "There is no item on the agenda uuid: " <> BL.pack (show uuid) <> " doesn't exist!" })
 
 type WithStaticFilesAPI
   =    LemmingAPI
