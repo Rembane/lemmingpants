@@ -94,9 +94,6 @@ type WithStaticFilesAPI
   =    LemmingAPI
   :<|> Raw -- Static files
 
-lemmingAPI :: Proxy LemmingAPI
-lemmingAPI = Proxy
-
 withStaticFilesAPI :: Proxy WithStaticFilesAPI
 withStaticFilesAPI = Proxy
 
