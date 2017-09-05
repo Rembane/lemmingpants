@@ -41,7 +41,8 @@ main = do
                     ( DB.save dbFilename )
                     ( \db -> do
                         putStrLn "Running with database..."
-                        uuids <- sequence (repeat nextRandom)
-                        atomically $ mapM_ (\(uuid, o, v) -> DB.createAgendaItem uuid o (T.pack v) "" db) (zip3 uuids [1..] vs)
+                        forM_ (zip [1..] vs) $ \(o, v) -> do
+                            uuid <- nextRandom
+                            atomically (DB.createAgendaItem uuid o (T.pack v) "" db)
                     )
 
