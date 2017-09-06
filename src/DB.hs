@@ -19,6 +19,7 @@ module DB
     , listAgendaItems
 
     , pushSpeakerQueue
+    , popSpeakerQueue
     ) where
 
 import qualified Data.ByteString as B
@@ -26,7 +27,8 @@ import Control.Concurrent.STM.TVar
 import Control.Monad.STM
 import Data.Function (on)
 import qualified Data.Map.Strict as M
-import Data.List (sortBy)
+import Data.List (sortBy, uncons)
+import Data.Maybe (maybeToList)
 import Data.Serialize (Serialize, decode, encode)
 import Data.Serialize.Text ()
 import qualified Data.Text as T
@@ -127,3 +129,11 @@ modifyAgendaItem f uuid db = do
 -- | Push a speakerqueue onto the speakerQueueStack.
 pushSpeakerQueue :: UUID -> TVar Database -> STM (Maybe AgendaItem)
 pushSpeakerQueue = modifyAgendaItem (\a -> a { speakerQueueStack = (SpeakerQueue V.empty) : speakerQueueStack a })
+
+-- | Pop a speakerqueue from the speakerQueueStack and throw it away.
+popSpeakerQueue :: UUID -> TVar Database -> STM (Maybe AgendaItem)
+popSpeakerQueue = modifyAgendaItem (\a -> a { speakerQueueStack = go a })
+    where
+        go a = case concat $ maybeToList $ fmap snd $ uncons $ speakerQueueStack a of
+                 [] -> [SpeakerQueue V.empty]
+                 xs -> xs

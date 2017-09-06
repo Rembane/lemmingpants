@@ -52,7 +52,7 @@ var SpeakerQueueStackComponent = {
                 })),
                 m('p', ['Speaker stack height: ', Agenda.getCurrent()['speakerQueueStack'].stackHeight()]),
                 m('button', { onclick: function() { Agenda.getCurrent()['speakerQueueStack'].push(); } }, 'Push speaker queue'),
-                m('button', 'Pop speaker queue'),
+                m('button', { onclick: function() { Agenda.getCurrent()['speakerQueueStack'].pop(); } }, 'Pop speaker queue'),
                 m('p', [
                     m('label', [
                         'Number',

@@ -58,11 +58,12 @@ type LemmingAPI
           (    "get"              :> ReqBody '[JSON] UUID :> Get  '[JSON] AgendaItem
           :<|> "list"             :>                         Get  '[JSON] [AgendaItem]
           :<|> "pushSpeakerQueue" :> ReqBody '[JSON] UUID :> Post '[JSON] [SpeakerQueue]
+          :<|> "popSpeakerQueue"  :> ReqBody '[JSON] UUID :> Post '[JSON] [SpeakerQueue]
           )
       )
 
 lemmingServerT :: ServerT LemmingAPI LemmingHandler
-lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> listAgendaItems :<|> pushSpeakerQueue)
+lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> listAgendaItems :<|> pushSpeakerQueue :<|> popSpeakerQueue)
     where
         createAttendee :: Text -> LemmingHandler Int
         createAttendee c = LemmingHandler $ do
@@ -95,6 +96,14 @@ lemmingServerT = (createAttendee :<|> listAttendees) :<|> (getAgendaItem :<|> li
         pushSpeakerQueue uuid = LemmingHandler $ do
             db' <- asks db
             r   <- liftIO $ atomically $ DB.pushSpeakerQueue uuid db'
+            case r of
+              Just r' -> return (speakerQueueStack r')
+              Nothing -> throwM (err404 { errBody = "There is no item on the agenda uuid: " <> BL.pack (show uuid) <> " doesn't exist!" })
+
+        popSpeakerQueue :: UUID -> LemmingHandler [SpeakerQueue]
+        popSpeakerQueue uuid = LemmingHandler $ do
+            db' <- asks db
+            r   <- liftIO $ atomically $ DB.popSpeakerQueue uuid db'
             case r of
               Just r' -> return (speakerQueueStack r')
               Nothing -> throwM (err404 { errBody = "There is no item on the agenda uuid: " <> BL.pack (show uuid) <> " doesn't exist!" })
