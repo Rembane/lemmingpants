@@ -10,7 +10,7 @@ var Agenda = {
     init: function() {
         m.request({
             method: 'GET',
-            url: '/agendaitem/list',
+            url: '/agenda/',
             headers: {
                 'Accept': 'application/json',
                 'Content-type': 'application/json'

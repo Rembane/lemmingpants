@@ -3,6 +3,21 @@
 import m from 'mithril';
 
 var AttendeeList = {
+    init: function() {
+        m.request({
+            method: 'GET',
+            url: '/attendee/list/',
+            headers: {
+                'Accept': 'application/json',
+                'Content-type': 'application/json'
+            }
+        }).then(function(as) {
+            AttendeeList.attendees = as;
+        });
+    }
+};
+/*
+var AttendeeList = {
     socket: null,
     init: function() {
         console.log(':D :D :D ');
@@ -21,5 +36,6 @@ var AttendeeList = {
         }
     }
 }
+*/
 
 export default AttendeeList;

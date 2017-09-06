@@ -15,7 +15,7 @@ import Control.Concurrent.STM.TChan (TChan)
 import Data.Aeson
 import Data.Monoid
 import Data.Text
-import qualified Data.Vector as V
+import Data.Sequence (Seq)
 import Data.UUID (UUID, fromWords, toWords)
 import GHC.Generics
 import qualified Network.WebSockets as WS
@@ -30,9 +30,10 @@ data Attendee = Attendee
     , cid :: Text
     } deriving (FromJSON, Generic, Show, ToJSON)
 
-newtype SpeakerQueue = SpeakerQueue
-    { speakers :: V.Vector Attendee }
-    deriving (FromJSON, Generic, ToJSON)
+data SpeakerQueue = SpeakerQueue
+    { speakers :: Seq Attendee
+    , current  :: Maybe Attendee
+    } deriving (FromJSON, Generic, ToJSON)
 
 data AgendaItem = AgendaItem
     { id                :: UUID
