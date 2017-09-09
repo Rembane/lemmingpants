@@ -16,10 +16,7 @@ import Data.Aeson
 import Data.Monoid
 import Data.Text
 import qualified Data.Vector as V
-import Data.Serialize (Serialize(..))
-import Data.Serialize.Text ()
 import Data.UUID (UUID, fromWords, toWords)
-import Data.Vector.Serialize ()
 import GHC.Generics
 import qualified Network.WebSockets as WS
 
@@ -31,11 +28,11 @@ data MessageType where
 data Attendee = Attendee
     { id  :: Int
     , cid :: Text
-    } deriving (Generic, Show, Serialize, ToJSON)
+    } deriving (FromJSON, Generic, Show, ToJSON)
 
 newtype SpeakerQueue = SpeakerQueue
     { speakers :: V.Vector Attendee }
-    deriving (Generic, Serialize, ToJSON)
+    deriving (FromJSON, Generic, ToJSON)
 
 data AgendaItem = AgendaItem
     { id                :: UUID
@@ -43,8 +40,4 @@ data AgendaItem = AgendaItem
     , content           :: Text
     , speakerQueueStack :: [SpeakerQueue]
     , order             :: Int
-    } deriving (Generic, Serialize, ToJSON)
-
-instance Serialize UUID where
-    put = put . toWords
-    get = (\(a,b,c,d) -> fromWords a b c d) <$> get
+    } deriving (FromJSON, Generic, ToJSON)

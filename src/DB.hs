@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,19 +23,18 @@ module DB
     , popSpeakerQueue
     ) where
 
+import Data.Aeson
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Control.Concurrent.STM.TVar
 import Control.Monad.STM
 import Data.Function (on)
 import qualified Data.Map.Strict as M
 import Data.List (sortBy, uncons)
 import Data.Maybe (maybeToList)
-import Data.Serialize (Serialize, decode, encode)
-import Data.Serialize.Text ()
 import qualified Data.Text as T
 import Data.UUID (UUID)
 import qualified Data.Vector as V
-import Data.Vector.Serialize ()
 import GHC.Generics (Generic)
 import System.Directory (doesFileExist)
 
@@ -44,9 +44,7 @@ data Database = Database
     { attendees     :: M.Map T.Text Attendee -- ^ Find by CID.
     , attendeeIndex :: Int
     , agenda        :: M.Map UUID AgendaItem -- ^ Find by UUID.
-    } deriving (Generic)
-
-instance Serialize Database
+    } deriving (FromJSON, Generic, ToJSON)
 
 empty :: Database
 empty = Database
@@ -57,11 +55,11 @@ empty = Database
 
 -- | Save database to disk.
 save :: String -> TVar Database -> IO ()
-save fn db = (B.writeFile fn . encode) =<< readTVarIO db
+save fn db = (BL.writeFile fn . encode) =<< readTVarIO db
 
 -- | Load database from disk.
 load :: String -> IO (Either String Database)
-load = (fmap . fmap) decode B.readFile
+load = (fmap . fmap) eitherDecodeStrict' B.readFile
 
 -- | Dies horribly if database can't be loaded.
 loadOrDie :: String -> IO DB.Database
