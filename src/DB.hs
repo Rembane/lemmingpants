@@ -98,10 +98,11 @@ createAttendee cid db = do
     let atts = attendees db'
     case M.lookup cid (byCID atts) of
        Nothing ->
-          let a                = Attendee n cid
-              n                = 1 + idx atts
+          let a = Attendee n cid
+              n = 1 + idx atts
            in writeTVar db (db' { attendees = atts { byCID = M.insert cid a (byCID atts)
                                                    , byId  = M.insert n   a (byId  atts)
+                                                   , idx   = n
                                                    } } ) >> return a
        Just  a -> return a
 
