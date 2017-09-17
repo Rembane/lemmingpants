@@ -11,11 +11,11 @@ var AgendaComponent = {
         try {
             return m('section', [
                 m('h2', [
-                    m('button', { onclick: function() { Agenda.decCurrent(); } }, '|<'),
+                    m('button', { onclick: function() { Agenda.previous(); } }, '|<'),
                     m.trust('&sect;'),
-                    (Agenda.current + 1) + '. ',
+                    (Agenda.getCurrent().order + 1) + '. ',
                     Agenda.getCurrent().title,
-                    m('button', { onclick: function() { Agenda.incCurrent(); } }, '>|')
+                    m('button', { onclick: function() { Agenda.next(); } }, '>|')
                 ])
             ]);
         } catch(e) {

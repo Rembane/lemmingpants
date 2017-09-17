@@ -26,7 +26,6 @@ import Control.Monad.STM
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Text
-import Data.UUID (UUID)
 import Network.Wai.Handler.WebSockets (websocketsOr)
 import qualified Network.WebSockets as WS
 import Prelude hiding (id)
@@ -59,14 +58,13 @@ type SpeakerAPI
   :<|> "dequeue" :>                      Post '[JSON] [SpeakerQueue]
   :<|> "remove"  :> Capture "uid" Int :> Post '[JSON] [SpeakerQueue]
 
+-- We do all mutations on the current agenda item.
 type AgendaAPI
-  =    Get '[JSON] [AgendaItem] -- List agenda
-  :<|> (Capture "aid" UUID :>
-            (Get '[JSON] AgendaItem -- Detail agenda item
-       :<|> "speakerQueue" :> SpeakerQueueAPI
-       :<|> "speaker"      :> SpeakerAPI
-            )
-       )
+  =    Get '[JSON] FancyAgendaItem -- Get active agenda item
+  :<|> "previous"     :> Post '[JSON] FancyAgendaItem
+  :<|> "next"         :> Post '[JSON] FancyAgendaItem
+  :<|> "speakerQueue" :> SpeakerQueueAPI
+  :<|> "speaker"      :> SpeakerAPI
 
 type LemmingAPI
   =    "attendee" :> AttendeeAPI
@@ -93,67 +91,73 @@ attendeeT = createAttendee :<|> listAttendees
             liftIO $ atomically $ DB.listAttendees db'
 
 agendaT :: ServerT AgendaAPI LemmingHandler
-agendaT = listAgendaItems :<|> (\u -> getAgendaItem u :<|> speakerQueueT u :<|> speakerT u)
+agendaT = getAgendaItem
+        :<|> previous
+        :<|> next
+        :<|> speakerQueueT
+        :<|> speakerT
     where
-        listAgendaItems :: LemmingHandler [AgendaItem]
-        listAgendaItems = LemmingHandler $ do
+        getAgendaItem :: LemmingHandler FancyAgendaItem
+        getAgendaItem = LemmingHandler $ do
             db' <- asks db
-            liftIO $ atomically $ DB.listAgendaItems db'
+            (liftIO . atomically . DB.getFancyAgendaItem) db'
 
-        getAgendaItem :: UUID -> LemmingHandler AgendaItem
-        getAgendaItem uuid = LemmingHandler $ do
+        previous :: LemmingHandler FancyAgendaItem
+        previous = LemmingHandler $ do
             db' <- asks db
-            r   <- liftIO $ atomically $ DB.getAgendaItem uuid db'
-            case r of
-              Just r' -> return r'
-              Nothing -> throwM (err404 { errBody = "There is no item on the agenda with uuid: " <> BL.pack (show uuid) })
+            wch <- asks msgChan
+            (liftIO . atomically . DB.previousAgendaItem) db'
+            a <- (liftIO . atomically . DB.getFancyAgendaItem) db'
+            (liftIO . atomically . writeTChan wch) (NewCurrentAgendaItem a)
+            return a
 
+        next :: LemmingHandler FancyAgendaItem
+        next = LemmingHandler $ do
+            db' <- asks db
+            wch <- asks msgChan
+            (liftIO . atomically . DB.nextAgendaItem) db'
+            a <- (liftIO . atomically . DB.getFancyAgendaItem) db'
+            (liftIO . atomically . writeTChan wch) (NewCurrentAgendaItem a)
+            return a
 
-speakerQueueT :: UUID -> ServerT SpeakerQueueAPI LemmingHandler
-speakerQueueT uuid = pushSpeakerQueue uuid :<|> popSpeakerQueue uuid
+speakerQueueT :: ServerT SpeakerQueueAPI LemmingHandler
+speakerQueueT = pushSpeakerQueue :<|> popSpeakerQueue
     where
-        pushSpeakerQueue :: UUID -> LemmingHandler [SpeakerQueue]
-        pushSpeakerQueue uuid = LemmingHandler $ do
+        pushSpeakerQueue :: LemmingHandler [SpeakerQueue]
+        pushSpeakerQueue = LemmingHandler $ do
             db' <- asks db
-            r   <- liftIO $ atomically $ DB.pushSpeakerQueue uuid db'
-            case r of
-              Just r' -> return (speakerQueueStack r')
-              Nothing -> throwM (err404 { errBody = "There is no item on the agenda uuid: " <> BL.pack (show uuid) <> " doesn't exist!" })
+            liftIO $ atomically $ DB.pushSpeakerQueue db'
 
-        popSpeakerQueue :: UUID -> LemmingHandler [SpeakerQueue]
-        popSpeakerQueue uuid = LemmingHandler $ do
+        popSpeakerQueue :: LemmingHandler [SpeakerQueue]
+        popSpeakerQueue = LemmingHandler $ do
             db' <- asks db
-            r   <- liftIO $ atomically $ DB.popSpeakerQueue uuid db'
-            case r of
-              Just r' -> return (speakerQueueStack r')
-              Nothing -> throwM (err404 { errBody = "There is no item on the agenda uuid: " <> BL.pack (show uuid) <> " doesn't exist!" })
+            liftIO $ atomically $ DB.popSpeakerQueue db'
 
 -- speakerT :: ???
-speakerT uuid = enqueueSpeaker uuid :<|> dequeueSpeaker uuid :<|> removeSpeaker uuid
+speakerT = enqueueSpeaker :<|> dequeueSpeaker :<|> removeSpeaker
     where
-        enqueueSpeaker :: UUID -> Int -> LemmingHandler [SpeakerQueue]
-        enqueueSpeaker uuid i = LemmingHandler $ do
+        enqueueSpeaker :: Int -> LemmingHandler [SpeakerQueue]
+        enqueueSpeaker i = getOrThrowAttendee i >>= \a -> LemmingHandler $ do
             db' <- asks db
-            r   <- liftIO $ atomically $ DB.enqueueSpeaker i uuid db'
-            case r of
-              Just r' -> return (speakerQueueStack r')
-              Nothing -> throwM (err404 { errBody = "There is no item on the agenda uuid: " <> BL.pack (show uuid) <> " doesn't exist!" })
+            liftIO $ atomically $ DB.enqueueSpeaker a db'
 
-        dequeueSpeaker :: UUID -> LemmingHandler [SpeakerQueue]
-        dequeueSpeaker uuid = LemmingHandler $ do
+        dequeueSpeaker :: LemmingHandler [SpeakerQueue]
+        dequeueSpeaker = LemmingHandler $ do
             db' <- asks db
-            r   <- liftIO $ atomically $ DB.dequeueSpeaker uuid db'
-            case r of
-              Just r' -> return (speakerQueueStack r')
-              Nothing -> throwM (err404 { errBody = "There is no item on the agenda uuid: " <> BL.pack (show uuid) <> " doesn't exist!" })
+            liftIO $ atomically $ DB.dequeueSpeaker db'
 
-        removeSpeaker :: UUID -> Int -> LemmingHandler [SpeakerQueue]
-        removeSpeaker uuid i = LemmingHandler $ do
+        removeSpeaker :: Int -> LemmingHandler [SpeakerQueue]
+        removeSpeaker i = getOrThrowAttendee i >>= \a -> LemmingHandler $ do
             db' <- asks db
-            r   <- liftIO $ atomically $ DB.removeSpeaker i uuid db'
-            case r of
-              Just r' -> return (speakerQueueStack r')
-              Nothing -> throwM (err404 { errBody = "There is no item on the agenda uuid: " <> BL.pack (show uuid) <> " doesn't exist!" })
+            (liftIO . atomically) (DB.removeSpeaker a db')
+
+getOrThrowAttendee :: Int -> LemmingHandler Attendee
+getOrThrowAttendee i = LemmingHandler $ do
+    db' <- asks db
+    ma  <- (liftIO . atomically) (DB.getAttendee i db')
+    case ma of
+      Just  a -> return a
+      Nothing -> throwM (err404 { errBody = "There is no attendee with this id: " <> BL.pack (show i) })
 
 lemmingServerT :: ServerT LemmingAPI LemmingHandler
 lemmingServerT = attendeeT :<|> agendaT

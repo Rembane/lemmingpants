@@ -6,10 +6,8 @@ import Control.Concurrent.STM.TVar (newTVarIO)
 import Control.Exception (bracket)
 import Control.Monad
 import Control.Monad.STM (atomically)
-import Data.List (zip3)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
-import Data.UUID.V4 (nextRandom)
 import System.Environment (getArgs)
 import Text.Megaparsec
 
@@ -41,8 +39,7 @@ main = do
                     ( DB.save dbFilename )
                     ( \db -> do
                         putStrLn "Running with database..."
-                        forM_ (zip [1..] vs) $ \(o, v) -> do
-                            uuid <- nextRandom
-                            atomically (DB.createAgendaItem uuid o (T.pack v) "" db)
+                        forM_ vs $ \v -> do
+                            atomically (DB.createAgendaItem (T.pack v) "" db)
                     )
 

@@ -2,41 +2,44 @@ import m from 'mithril';
 
 import SpeakerQueueStack from './SpeakerQueueStack';
 
+function requestHelper(url, method) {
+    return m.request({
+        method: method,
+        url: url,
+        headers: {
+            'Accept': 'application/json',
+            'Content-type': 'application/json'
+        }
+    });
+}
+
+function updateAgenda(a) {
+    a['speakerQueueStack'] = SpeakerQueueStack(a['speakerQueueStack'], a);
+    Agenda.currentItem = a;
+}
+
 // Data model
 var Agenda = {
-    agenda: null,
-    current: 0,
+    currentItem: null,
 
     init: function() {
-        m.request({
-            method: 'GET',
-            url: '/agenda/',
-            headers: {
-                'Accept': 'application/json',
-                'Content-type': 'application/json'
-            }
-        }).then(function(as) {
-            Agenda.agenda = as.map(function(a) {
-                a['speakerQueueStack'] = SpeakerQueueStack(a['speakerQueueStack'], a);
-                return a;
-            });
-        });
+        requestHelper('/agenda/', 'GET').then(updateAgenda);
     },
 
     getCurrent: function() {
-        if(this.agenda !== null && this.agenda.length > 0) {
-            return this.agenda[this.current];
+        if(this.currentItem !== null) {
+            return this.currentItem;
         } else {
             throw Agenda.NotLoadedYetException;
         }
     },
 
-    incCurrent: function() {
-        this.current++;
+    next: function() {
+        requestHelper('/agenda/next/', 'POST').then(updateAgenda);
     },
 
-    decCurrent: function() {
-        this.current--;
+    previous: function() {
+        requestHelper('/agenda/previous/', 'POST').then(updateAgenda);
     },
 
     // Exceptions and other nice things.
