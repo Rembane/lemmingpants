@@ -32,7 +32,7 @@ stack install
 This is a nice command for starting the nix shell. In the shell you can run `cabal build` and `cabal install` as usual.
 
 ```bash
-nix-shell --attr env release0.nix
+nix-shell
 ```
 
 When you change anything in the cabal file, run this command:
