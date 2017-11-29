@@ -9,9 +9,9 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Lib
-    ( app
+  ( app
     , Config(..)
-    ) where
+  ) where
 
 import Data.Aeson (encode)
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -38,12 +38,12 @@ import Types
 
 -- | Configuration
 data Config = Config
-    { db      :: TVar DB.Database
+  { db      :: TVar DB.Database
     , msgChan :: TChan MessageType
-    }
+  }
 
 newtype LemmingHandler a = LemmingHandler { runLemmingHandler :: ReaderT Config IO a }
-    deriving ( Functor, Applicative, Monad, MonadReader Config )
+  deriving ( Functor, Applicative, Monad, MonadReader Config )
 
 type AttendeeAPI
   =    "create" :> ReqBody '[JSON] Text :> Post '[JSON] Int
@@ -76,19 +76,19 @@ type WithStaticFilesAPI
 
 attendeeT :: ServerT AttendeeAPI LemmingHandler
 attendeeT = createAttendee :<|> listAttendees
-    where
-        createAttendee :: Text -> LemmingHandler Int
-        createAttendee c = LemmingHandler $ do
-            db' <- asks db
-            a   <- liftIO $ atomically $ DB.createAttendee c db'
-            wch <- asks msgChan
-            liftIO $ atomically $ writeTChan wch (Notify (encode a))
-            return $ (id :: Attendee -> Int) a
+  where
+    createAttendee :: Text -> LemmingHandler Int
+    createAttendee c = LemmingHandler $ do
+      db' <- asks db
+      a   <- liftIO $ atomically $ DB.createAttendee c db'
+      wch <- asks msgChan
+      liftIO $ atomically $ writeTChan wch (Notify (encode a))
+      return $ (id :: Attendee -> Int) a
 
-        listAttendees :: LemmingHandler [Attendee]
-        listAttendees = LemmingHandler $ do
-            db' <- asks db
-            liftIO $ atomically $ DB.listAttendees db'
+    listAttendees :: LemmingHandler [Attendee]
+    listAttendees = LemmingHandler $ do
+      db' <- asks db
+      liftIO $ atomically $ DB.listAttendees db'
 
 agendaT :: ServerT AgendaAPI LemmingHandler
 agendaT = getAgendaItem
@@ -96,68 +96,68 @@ agendaT = getAgendaItem
         :<|> next
         :<|> speakerQueueT
         :<|> speakerT
-    where
-        getAgendaItem :: LemmingHandler FancyAgendaItem
-        getAgendaItem = LemmingHandler $ do
-            db' <- asks db
-            (liftIO . atomically . DB.getFancyAgendaItem) db'
+  where
+    getAgendaItem :: LemmingHandler FancyAgendaItem
+    getAgendaItem = LemmingHandler $ do
+      db' <- asks db
+      (liftIO . atomically . DB.getFancyAgendaItem) db'
 
-        previous :: LemmingHandler FancyAgendaItem
-        previous = LemmingHandler $ do
-            db' <- asks db
-            wch <- asks msgChan
-            (liftIO . atomically . DB.previousAgendaItem) db'
-            a <- (liftIO . atomically . DB.getFancyAgendaItem) db'
-            (liftIO . atomically . writeTChan wch) (NewCurrentAgendaItem a)
-            return a
+    previous :: LemmingHandler FancyAgendaItem
+    previous = LemmingHandler $ do
+      db' <- asks db
+      wch <- asks msgChan
+      (liftIO . atomically . DB.previousAgendaItem) db'
+      a <- (liftIO . atomically . DB.getFancyAgendaItem) db'
+      (liftIO . atomically . writeTChan wch) (NewCurrentAgendaItem a)
+      return a
 
-        next :: LemmingHandler FancyAgendaItem
-        next = LemmingHandler $ do
-            db' <- asks db
-            wch <- asks msgChan
-            (liftIO . atomically . DB.nextAgendaItem) db'
-            a <- (liftIO . atomically . DB.getFancyAgendaItem) db'
-            (liftIO . atomically . writeTChan wch) (NewCurrentAgendaItem a)
-            return a
+    next :: LemmingHandler FancyAgendaItem
+    next = LemmingHandler $ do
+      db' <- asks db
+      wch <- asks msgChan
+      (liftIO . atomically . DB.nextAgendaItem) db'
+      a <- (liftIO . atomically . DB.getFancyAgendaItem) db'
+      (liftIO . atomically . writeTChan wch) (NewCurrentAgendaItem a)
+      return a
 
 speakerQueueT :: ServerT SpeakerQueueAPI LemmingHandler
 speakerQueueT = pushSpeakerQueue :<|> popSpeakerQueue
-    where
-        pushSpeakerQueue :: LemmingHandler [SpeakerQueue]
-        pushSpeakerQueue = LemmingHandler $ do
-            db' <- asks db
-            liftIO $ atomically $ DB.pushSpeakerQueue db'
+  where
+    pushSpeakerQueue :: LemmingHandler [SpeakerQueue]
+    pushSpeakerQueue = LemmingHandler $ do
+      db' <- asks db
+      liftIO $ atomically $ DB.pushSpeakerQueue db'
 
-        popSpeakerQueue :: LemmingHandler [SpeakerQueue]
-        popSpeakerQueue = LemmingHandler $ do
-            db' <- asks db
-            liftIO $ atomically $ DB.popSpeakerQueue db'
+    popSpeakerQueue :: LemmingHandler [SpeakerQueue]
+    popSpeakerQueue = LemmingHandler $ do
+      db' <- asks db
+      liftIO $ atomically $ DB.popSpeakerQueue db'
 
 -- speakerT :: ???
 speakerT = enqueueSpeaker :<|> dequeueSpeaker :<|> removeSpeaker
-    where
-        enqueueSpeaker :: Int -> LemmingHandler [SpeakerQueue]
-        enqueueSpeaker i = getOrThrowAttendee i >>= \a -> LemmingHandler $ do
-            db' <- asks db
-            liftIO $ atomically $ DB.enqueueSpeaker a db'
+  where
+    enqueueSpeaker :: Int -> LemmingHandler [SpeakerQueue]
+    enqueueSpeaker i = getOrThrowAttendee i >>= \a -> LemmingHandler $ do
+      db' <- asks db
+      liftIO $ atomically $ DB.enqueueSpeaker a db'
 
-        dequeueSpeaker :: LemmingHandler [SpeakerQueue]
-        dequeueSpeaker = LemmingHandler $ do
-            db' <- asks db
-            liftIO $ atomically $ DB.dequeueSpeaker db'
+    dequeueSpeaker :: LemmingHandler [SpeakerQueue]
+    dequeueSpeaker = LemmingHandler $ do
+      db' <- asks db
+      liftIO $ atomically $ DB.dequeueSpeaker db'
 
-        removeSpeaker :: Int -> LemmingHandler [SpeakerQueue]
-        removeSpeaker i = getOrThrowAttendee i >>= \a -> LemmingHandler $ do
-            db' <- asks db
-            (liftIO . atomically) (DB.removeSpeaker a db')
+    removeSpeaker :: Int -> LemmingHandler [SpeakerQueue]
+    removeSpeaker i = getOrThrowAttendee i >>= \a -> LemmingHandler $ do
+      db' <- asks db
+      (liftIO . atomically) (DB.removeSpeaker a db')
 
 getOrThrowAttendee :: Int -> LemmingHandler Attendee
 getOrThrowAttendee i = LemmingHandler $ do
-    db' <- asks db
-    ma  <- (liftIO . atomically) (DB.getAttendee i db')
-    case ma of
-      Just  a -> return a
-      Nothing -> throwM (err404 { errBody = "There is no attendee with this id: " <> BL.pack (show i) })
+  db' <- asks db
+  ma  <- (liftIO . atomically) (DB.getAttendee i db')
+  case ma of
+    Just  a -> return a
+    Nothing -> throwM (err404 { errBody = "There is no attendee with this id: " <> BL.pack (show i) })
 
 lemmingServerT :: ServerT LemmingAPI LemmingHandler
 lemmingServerT = attendeeT :<|> agendaT
@@ -167,25 +167,26 @@ withStaticFilesAPI = Proxy
 
 handleWS :: Config -> WS.PendingConnection -> IO ()
 handleWS conf req = do
-    conn <- WS.acceptRequest req
-    WS.forkPingThread conn 30
-    as <- liftIO $ atomically $ DB.listAttendees $ db conf
-    WS.sendTextData conn (encode as)
-    ch <- atomically $ dupTChan (msgChan conf)
-    forever $ do
-        msg <- atomically $ readTChan ch
-        case msg of
-          Notify m -> WS.sendTextData conn m
+  conn <- WS.acceptRequest req
+  WS.forkPingThread conn 30
+  as <- liftIO $ atomically $ DB.listAttendees $ db conf
+  WS.sendTextData conn (encode as)
+  ch <- atomically $ dupTChan (msgChan conf)
+  forever $ do
+    msg <- atomically $ readTChan ch
+    case msg of
+      Notify m -> WS.sendTextData conn m
 
 app :: Config -> Application
-app conf = websocketsOr
-            WS.defaultConnectionOptions
-            (handleWS conf)
-            (serve
-                withStaticFilesAPI
-                ((convert conf `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
-            )
-    where
-        convert :: Config -> LemmingHandler :~> Handler
-        convert c = NT (Handler . ExceptT . try . (`runReaderT` c) . runLemmingHandler)
+app conf =
+  websocketsOr
+    WS.defaultConnectionOptions
+    (handleWS conf)
+    (serve
+        withStaticFilesAPI
+        ((convert conf `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
+    )
+  where
+    convert :: Config -> LemmingHandler :~> Handler
+    convert c = NT (Handler . ExceptT . try . (`runReaderT` c) . runLemmingHandler)
 

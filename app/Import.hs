@@ -27,19 +27,20 @@ devourLine = manyTill anyChar eol *> return ""
 
 main :: IO ()
 main = do
-    fn <- (!! 0) <$> getArgs
-    contents <- (fmap (filter (/= "")) . parse (many (punkt <|> devourLine)) fn) <$> readFile fn
-    case contents of
-      Left  e  -> putStrLn ("Got this weird error while parsing file. Stopping now." <> show e)
-      Right vs -> bracket
-                    ( do
-                        db <- DB.loadOrDie dbFilename
-                        newTVarIO db
-                    )
-                    ( DB.save dbFilename )
-                    ( \db -> do
-                        putStrLn "Running with database..."
-                        forM_ vs $ \v -> do
-                            atomically (DB.createAgendaItem (T.pack v) "" db)
-                    )
+  fn <- (!! 0) <$> getArgs
+  contents <- (fmap (filter (/= "")) . parse (many (punkt <|> devourLine)) fn) <$> readFile fn
+  case contents of
+    Left  e  -> putStrLn ("Got this weird error while parsing file. Stopping now." <> show e)
+    Right vs ->
+      bracket
+        ( do
+            db <- DB.loadOrDie dbFilename
+            newTVarIO db
+        )
+        ( DB.save dbFilename )
+        ( \db -> do
+            putStrLn "Running with database..."
+            forM_ vs $ \v -> do
+                atomically (DB.createAgendaItem (T.pack v) "" db)
+        )
 

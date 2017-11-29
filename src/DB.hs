@@ -52,21 +52,21 @@ import Types
 -- be reflected everywhere you need to use somekind of reference or other
 -- interesting construct.
 data Attendees = Attendees
-    { byCID :: M.Map T.Text Attendee
-    , byId  :: M.Map Int    Attendee
-    , idx   :: Int
-    } deriving (FromJSON, Generic, ToJSON)
+  { byCID :: M.Map T.Text Attendee
+  , byId  :: M.Map Int    Attendee
+  , idx   :: Int
+  } deriving (FromJSON, Generic, ToJSON)
 
 data Database = Database
-    { attendees     :: Attendees
-    , agenda        :: Agenda
-    } deriving (FromJSON, Generic, ToJSON)
+  { attendees     :: Attendees
+  , agenda        :: Agenda
+  } deriving (FromJSON, Generic, ToJSON)
 
 empty :: Database
 empty = Database
-    { attendees = Attendees M.empty M.empty 0
-    , agenda    = Agenda [] []
-    }
+  { attendees = Attendees M.empty M.empty 0
+  , agenda    = Agenda [] []
+  }
 
 -- | Save database to disk.
 save :: String -> TVar Database -> IO ()
@@ -79,15 +79,15 @@ load = (fmap . fmap) eitherDecodeStrict' B.readFile
 -- | Dies horribly if database can't be loaded.
 loadOrDie :: String -> IO Database
 loadOrDie fn = do
-    exists <- doesFileExist fn
-    if exists
-       then do
-            db <- DB.load fn
-            case db of
-              Left  s   -> error s
-              Right db' -> return db'
-       else
-            return DB.empty
+  exists <- doesFileExist fn
+  if exists
+     then do
+          db <- DB.load fn
+          case db of
+            Left  s   -> error s
+            Right db' -> return db'
+     else
+          return DB.empty
 
 -- | Creates an attendee and puts it in the database.
 -- If the attendee already exists, return it instead.
@@ -120,9 +120,9 @@ getActiveAgendaItem db = (head . future . agenda) <$> readTVar db
 -- | Get the active agenda item nicely formatted.
 getFancyAgendaItem :: TVar Database -> STM FancyAgendaItem
 getFancyAgendaItem db =
-    mkFancyAgendaItem
-        <$> (length . history . agenda <$> readTVar db)
-        <*> DB.getActiveAgendaItem db
+  mkFancyAgendaItem
+      <$> (length . history . agenda <$> readTVar db)
+      <*> DB.getActiveAgendaItem db
 
 -- | Modify an agenda.
 modifyAgenda :: (Agenda -> Agenda) -> TVar Database -> STM ()
@@ -131,30 +131,30 @@ modifyAgenda f db = modifyTVar' db (\db' -> (db' { agenda = f (agenda db') }))
 -- | Sets the previous agenda item as the current one.
 previousAgendaItem :: TVar Database -> STM AgendaItem
 previousAgendaItem db = modifyAgenda go db >> getActiveAgendaItem db
-    where
-        go a = case history a of
-                 []     -> a
-                 (x:xs) -> a { history = xs, future = x : future a }
+  where
+    go a = case history a of
+             []     -> a
+             (x:xs) -> a { history = xs, future = x : future a }
 
 -- | Sets the next agenda item as the current one.
 nextAgendaItem :: TVar Database -> STM AgendaItem
 nextAgendaItem db = modifyAgenda go db >> getActiveAgendaItem db
-    where
-        go a = case future a of
-                 []     -> a
-                 [x]    -> a
-                 (x:xs) -> a { history = x : history a, future = xs }
+  where
+    go a = case future a of
+             []     -> a
+             [x]    -> a
+             (x:xs) -> a { history = x : history a, future = xs }
 
 -- | Create an item on the agenda.
 createAgendaItem :: T.Text -> T.Text -> TVar Database -> STM AgendaItem
 createAgendaItem t c db = const a <$> modifyAgenda go db
-    where
-        go ag = ag { future = future ag ++ [a] }
-        a = AgendaItem
-          { title             = t
-          , content           = c
-          , speakerQueueStack = [SpeakerQueue Seq.empty Nothing]
-          }
+  where
+    go ag = ag { future = future ag ++ [a] }
+    a = AgendaItem
+      { title             = t
+      , content           = c
+      , speakerQueueStack = [SpeakerQueue Seq.empty Nothing]
+      }
 
 -- | Modify an agenda item using a higher order function.
 -- Returns Nothing if the agenda item couldn't be found.
@@ -168,16 +168,16 @@ pushSpeakerQueue db = modifyAgendaItem (\a -> a { speakerQueueStack = (SpeakerQu
 -- | Pop a speaker queue from the speakerQueueStack and throw it away.
 popSpeakerQueue :: TVar Database -> STM [SpeakerQueue]
 popSpeakerQueue db = modifyAgendaItem (\a -> a { speakerQueueStack = go a }) db >> (speakerQueueStack <$> getActiveAgendaItem db)
-    where
-        go a = case concat $ maybeToList $ fmap snd $ uncons $ speakerQueueStack a of
-                 [] -> [SpeakerQueue Seq.empty Nothing]
-                 xs -> xs
+  where
+    go a = case concat $ maybeToList $ fmap snd $ uncons $ speakerQueueStack a of
+             [] -> [SpeakerQueue Seq.empty Nothing]
+             xs -> xs
 
 -- | Modify the top element of the speaker queue stack.
 modifyTopOfStack :: (SpeakerQueue -> SpeakerQueue) -> TVar Database -> STM [SpeakerQueue]
 modifyTopOfStack f db = modifyAgendaItem (\a -> a {speakerQueueStack = go $ speakerQueueStack a }) db >> (speakerQueueStack <$> getActiveAgendaItem db)
-    where
-        go (x:xs) = f x : xs
+  where
+    go (x:xs) = f x : xs
 
 -- | Find a speaker by Id in the database.
 lookupSpeaker :: Int -> TVar Database -> STM (Maybe Attendee)
@@ -191,11 +191,11 @@ enqueueSpeaker a db = modifyTopOfStack (\s -> s { speakers = (Seq.|> a) $ speake
 -- the speaker as the current speaker.
 dequeueSpeaker :: TVar Database -> STM [SpeakerQueue]
 dequeueSpeaker db = modifyTopOfStack go db
-    where
-        go :: SpeakerQueue -> SpeakerQueue
-        go s = case Seq.viewl $ speakers s of
-                 Seq.EmptyL  -> SpeakerQueue Seq.empty Nothing
-                 a Seq.:< s' -> s { speakers = s', current = Just a }
+  where
+    go :: SpeakerQueue -> SpeakerQueue
+    go s = case Seq.viewl $ speakers s of
+             Seq.EmptyL  -> SpeakerQueue Seq.empty Nothing
+             a Seq.:< s' -> s { speakers = s', current = Just a }
 
 -- | Remove all the occurences of a speaker from the topmost speaker queue.
 removeSpeaker :: Attendee -> TVar Database -> STM [SpeakerQueue]
