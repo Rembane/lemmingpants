@@ -39,7 +39,7 @@ import Types
 -- | Configuration
 data Config = Config
   { db      :: TVar DB.Database
-    , msgChan :: TChan MessageType
+  , msgChan :: TChan MessageType
   }
 
 newtype LemmingHandler a = LemmingHandler { runLemmingHandler :: ReaderT Config IO a }
@@ -183,8 +183,8 @@ app conf =
     WS.defaultConnectionOptions
     (handleWS conf)
     (serve
-        withStaticFilesAPI
-        ((convert conf `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
+      withStaticFilesAPI
+      ((convert conf `enter` lemmingServerT) :<|> serveDirectoryFileServer "static")
     )
   where
     convert :: Config -> LemmingHandler :~> Handler
