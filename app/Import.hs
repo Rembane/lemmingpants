@@ -10,6 +10,7 @@ import Data.Monoid ((<>))
 import qualified Data.Text as T
 import System.Environment (getArgs)
 import Text.Megaparsec
+import Text.Megaparsec.Char
 
 import qualified DB
 
