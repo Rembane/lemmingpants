@@ -21,3 +21,7 @@ createuser -P lemmingpants
 createdb lemmingpants -O lemmingpants
 psql -d lemmingpants < init.sql
 ```
+
+## Running in dev-mode
+
+For development, the local web-server that serves the static resources is run by with this command `./de-server.sh`
