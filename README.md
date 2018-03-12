@@ -8,37 +8,16 @@ The name is much inspired by DHack's totem animal, the [lemming](https://www.you
 
 ## Installation
 
-The package is built using either stack or nix and cabal. Please file an issue if you have any problem building this package.
+Install the programs below and rock on!
 
-### Always run these
+- Postgrest https://github.com/begriffs/postgrest
+- Postgresql
+- A web server of your choice
 
-We need to install some Javascript stuff. Do that by running these commands in sequence:
-
-```bash
-npm install
-./build_javascript.sh
-```
-
-And then everything regarding Javascript should work, if it doesn't, file an issue!
-
-### stack
+### Initialize the database
 
 ```bash
-stack install
+createuser -P lemmingpants
+createdb lemmingpants -O lemmingpants
+psql -d lemmingpants < init.sql
 ```
-
-### nix + cabal
-
-This is a nice command for starting the nix shell. In the shell you can run `cabal build` and `cabal install` as usual.
-
-```bash
-nix-shell
-```
-
-When you change anything in the cabal file, run this command:
-
-```bash
-cabal2nix . > default.nix
-```
-
-TODO: More build guide for nix!
