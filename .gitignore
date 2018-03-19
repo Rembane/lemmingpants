@@ -1,3 +1,7 @@
 node_modules/*
 dist/*
 bundle.js*
+*/.psc-package/*
+*/.psci_modules/*
+.stack-work/*
+*/bower_components/*
