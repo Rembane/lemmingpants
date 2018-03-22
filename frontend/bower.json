@@ -14,7 +14,8 @@
     "purescript-aff": "^4.0.2",
     "purescript-affjax": "^5.0.0",
     "purescript-simple-json": "^2.0.1",
-    "purescript-routing": "^7.0.0"
+    "purescript-routing": "^7.0.0",
+    "purescript-dom-classy": "^2.1.0"
   },
   "devDependencies": {
     "purescript-debug": "^3.0.0",

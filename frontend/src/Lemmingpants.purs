@@ -44,7 +44,7 @@ type State = { currentLocation :: Location }
 data Query a
   = ChangePage Location a
 
-component :: forall m. H.Component HH.HTML Query Unit Void m
+component :: forall e. H.Component HH.HTML Query Unit Void (Aff (HA.HalogenEffects e))
 component =
   H.parentComponent
     { initialState: const { currentLocation: Home }
@@ -53,7 +53,7 @@ component =
     , receiver: const Nothing
     }
   where
-    render :: State -> H.ParentHTML Query (ProxyQ (Const Void) Unit Void) Int m
+    render :: State -> H.ParentHTML Query (ProxyQ (Const Void) Unit Void) Int (Aff (HA.HalogenEffects e))
     render state =
       HH.div_
         [ HH.ul_
@@ -67,7 +67,7 @@ component =
       where
         locationToSlot
           :: Location
-          -> H.ParentHTML Query (ProxyQ (Const Void) Unit Void) Int m
+          -> H.ParentHTML Query (ProxyQ (Const Void) Unit Void) Int (Aff (HA.HalogenEffects e))
         locationToSlot =
           case _ of
             Terminal -> go 1 VT.component
@@ -77,11 +77,11 @@ component =
           where
             go :: forall g
              . Int
-            -> H.Component HH.HTML g Unit Void m
-            -> H.ParentHTML Query (ProxyQ (Const Void) Unit Void) Int m
+            -> H.Component HH.HTML g Unit Void (Aff (HA.HalogenEffects e))
+            -> H.ParentHTML Query (ProxyQ (Const Void) Unit Void) Int (Aff (HA.HalogenEffects e))
             go i c = HH.slot i (proxy c) unit (const Nothing)
 
-    eval :: Query ~> H.ParentDSL State Query (ProxyQ (Const Void) Unit Void) Int Void m
+    eval :: Query ~> H.ParentDSL State Query (ProxyQ (Const Void) Unit Void) Int Void (Aff (HA.HalogenEffects e))
     eval =
       case _ of
         ChangePage l next -> H.modify (_ {currentLocation = l}) *> pure next
