@@ -12,6 +12,7 @@ Install the programs below and rock on!
 
 - Postgrest https://github.com/begriffs/postgrest
 - Postgresql
+- PGJWT: https://github.com/michelp/pgjwt
 - A web server of your choice
 
 ### Initialize the database
@@ -19,6 +20,7 @@ Install the programs below and rock on!
 ```bash
 createuser -P lemmingpants
 createdb lemmingpants -O lemmingpants
+psql -d lemmingpants 'ALTER DATABASE lemmingpants SET "app.jwt_secret" TO "feBU1ykZ4icKs2nKam9l8CD84qhgeOl6QQakrUJBiRTUu4dKTLVoH8o";'
 psql -d lemmingpants < init.sql
 ```
 
