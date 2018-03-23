@@ -1,18 +1,19 @@
 module Lemmingpants where
 
+import Browser.WebStorage (localStorage, setItem)
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff, launchAff_)
 import Control.Monad.Eff (Eff)
 import Data.Either.Nested (Either5)
 import Data.Functor.Coproduct.Nested (Coproduct5)
 import Data.Maybe (Maybe(..))
+import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Network.HTTP.Affjax (AJAX)
 import Prelude (type (~>), Unit, Void, const, pure, show, unit, (*>), (<$), (>>>))
 import Routing.Hash (matches)
 import Routing.Match (Match)
@@ -57,18 +58,20 @@ data Query a
   = ChangePage Location   a
   | LoginMsg   VL.Message a
 
-type LemmingPantsMonad e = Aff (HA.HalogenEffects (ajax :: AJAX | e))
+tokenKey :: String
+tokenKey = "token"
 
-component :: forall e. H.Component HH.HTML Query Unit Void (LemmingPantsMonad e)
-component =
+-- | Takes a token as first argument.
+component :: forall e. Maybe String -> H.Component HH.HTML Query Unit Void (Aff (LemmingPantsEffects e))
+component token =
   H.parentComponent
-    { initialState: const { currentLocation: Home, token: Nothing }
+    { initialState: const { currentLocation: Home, token: token }
     , render
     , eval
     , receiver: const Nothing
     }
   where
-    render :: State -> H.ParentHTML Query ChildQuery ChildSlot (LemmingPantsMonad e)
+    render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
     render state =
       HH.div_
         [ HH.ul_
@@ -88,7 +91,7 @@ component =
       where
         locationToSlot
           :: Location
-          -> H.ParentHTML Query ChildQuery ChildSlot (LemmingPantsMonad e)
+          -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
         locationToSlot =
           case _ of
             Terminal -> go CP.cp1 1 VT.component (const Nothing)
@@ -100,15 +103,18 @@ component =
             go :: forall g o
              . CP.ChildPath g ChildQuery Int ChildSlot
             -> Int
-            -> H.Component HH.HTML g Unit o (LemmingPantsMonad e)
+            -> H.Component HH.HTML g Unit o (Aff (LemmingPantsEffects e))
             -> (o -> Maybe (Query Unit))
-            -> H.ParentHTML Query ChildQuery ChildSlot (LemmingPantsMonad e)
+            -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
             go cp i c f = HH.slot' cp i c unit f
 
-    eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (LemmingPantsMonad e)
+    eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (LemmingPantsEffects e))
     eval =
       case _ of
         ChangePage l next -> H.modify (_ {currentLocation = l}) *> pure next
         LoginMsg   m next ->
           case m of
-            VL.NewToken t -> H.modify (_ {token = Just t}) *> pure next
+            VL.NewToken t ->
+              H.modify (_ {token = Just t})
+              *> H.liftEff (setItem localStorage tokenKey t)
+              *> pure next

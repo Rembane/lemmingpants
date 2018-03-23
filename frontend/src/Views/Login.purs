@@ -10,8 +10,8 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.MediaType (MediaType(..))
 import Data.Monoid (mempty)
 import Data.StrMap (StrMap, insert)
+import Effects (LemmingPantsEffects)
 import Halogen as H
-import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -32,9 +32,7 @@ data Query a
 
 data Message = NewToken String
 
-type LoginMonad e = Aff (HA.HalogenEffects (ajax :: AX.AJAX | e))
-
-component :: forall e. H.Component HH.HTML Query Unit Message (LoginMonad e)
+component :: forall e. H.Component HH.HTML Query Unit Message (Aff (LemmingPantsEffects e))
 component =
   H.component
     { initialState: const { formState: mempty, flash: Nothing }
@@ -65,7 +63,7 @@ component =
             ]
           ])
 
-    eval :: Query ~> H.ComponentDSL State Query Message (LoginMonad e)
+    eval :: Query ~> H.ComponentDSL State Query Message (Aff (LemmingPantsEffects e))
     eval =
       case _ of
         UpdateField k v next ->
