@@ -18,24 +18,23 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax as AX
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Partial.Unsafe (unsafePartial)
-import Prelude (type (~>), Unit, bind, const, discard, pure, (*>), (<$>), (<>))
+import Prelude (type (~>), Unit, bind, const, discard, pure, (*>), (<$>))
 import Simple.JSON (read, writeJSON)
 import Utils (withLabel)
 
-type State =
-  { formState :: StrMap String
-  , flash     :: Maybe String
-  }
+type State = { formState :: StrMap String }
 data Query a
   = UpdateField String String a
   | SubmitForm a
 
-data Message = NewToken String
+data Message
+  = NewToken String
+  | Flash    String
 
 component :: forall e. H.Component HH.HTML Query Unit Message (Aff (LemmingPantsEffects e))
 component =
   H.component
-    { initialState: const { formState: mempty, flash: Nothing }
+    { initialState: const { formState: mempty }
     , render
     , eval
     , receiver: const Nothing
@@ -44,24 +43,19 @@ component =
     render :: State -> H.ComponentHTML Query
     render state =
       HH.div_
-          (( case state.flash of
-              Nothing -> []
-              Just  s -> [ HH.div_ [ HH.text s ] ]
-          )
-          <>
-          [ HH.h1_ [HH.text "Login"]
-          , HH.form
-            [ HE.onSubmit (HE.input_ SubmitForm) ]
-            [ withLabel UpdateField HP.InputText     true  "username" "Username"
-            , withLabel UpdateField HP.InputPassword true  "password" "Password"
-            , HH.p_
-              [ HH.input
-                [ HP.type_ HP.InputSubmit
-                , HP.value "Login!"
-                ]
+        [ HH.h1_ [HH.text "Login"]
+        , HH.form
+          [ HE.onSubmit (HE.input_ SubmitForm) ]
+          [ withLabel UpdateField HP.InputText     true  "username" "Username"
+          , withLabel UpdateField HP.InputPassword true  "password" "Password"
+          , HH.p_
+            [ HH.input
+              [ HP.type_ HP.InputSubmit
+              , HP.value "Login!"
               ]
             ]
-          ])
+          ]
+        ]
 
     eval :: Query ~> H.ComponentDSL State Query Message (Aff (LemmingPantsEffects e))
     eval =
@@ -79,7 +73,7 @@ component =
                      , content = Just d
                  }))
           case parseToken r.response of
-            Left  es -> H.modify (\s -> s { flash = Just (foldMap renderForeignError es) })
+            Left  es -> H.raise (Flash (foldMap renderForeignError es))
             Right ts -> let t = unsafePartial (fromJust (A.head ts))
                          in H.raise (NewToken t.token )
           pure next

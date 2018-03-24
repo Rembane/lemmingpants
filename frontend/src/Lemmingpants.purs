@@ -14,7 +14,7 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (type (~>), Unit, Void, const, pure, show, unit, (*>), (<$), (>>>))
+import Prelude (type (~>), Unit, Void, const, pure, show, unit, (*>), (<$), (<>), (>>>))
 import Routing.Hash (matches)
 import Routing.Match (Match)
 import Routing.Match.Class (lit)
@@ -52,11 +52,12 @@ routeSignal driver
 type State =
   { currentLocation :: Location
   , token           :: Maybe String
+  , flash           :: Maybe String
   }
 
 data Query a
-  = ChangePage Location   a
-  | LoginMsg   VL.Message a
+  = ChangePage  Location   a
+  | LoginMsg    VL.Message a
 
 tokenKey :: String
 tokenKey = "token"
@@ -65,15 +66,20 @@ tokenKey = "token"
 component :: forall e. Maybe String -> H.Component HH.HTML Query Unit Void (Aff (LemmingPantsEffects e))
 component token =
   H.parentComponent
-    { initialState: const { currentLocation: Home, token: token }
+    { initialState: const { currentLocation: Home, token: token, flash: Nothing }
     , render
     , eval
     , receiver: const Nothing
     }
   where
+
     render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
     render state =
       HH.div_
+        (( case state.flash of
+            Nothing -> []
+            Just  s -> [ HH.div_ [ HH.text s ] ]
+        ) <>
         [ HH.ul_
           [ HH.li_ [HH.a [HP.href "#terminal"] [HH.text "Terminal"]]
           , HH.li_ [HH.a [HP.href "#overhead"] [HH.text "Overhead"]]
@@ -87,7 +93,7 @@ component token =
           , HH.text (show state.token)
           ]
         , locationToSlot state.currentLocation
-        ]
+        ])
       where
         locationToSlot
           :: Location
@@ -117,4 +123,7 @@ component token =
             VL.NewToken t ->
               H.modify (_ {token = Just t})
               *> H.liftEff (setItem localStorage tokenKey t)
+              *> pure next
+            VL.Flash s ->
+              H.modify (_ {flash = Just s})
               *> pure next
