@@ -87,6 +87,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA api TO web_anon;
 DROP ROLE IF EXISTS insert_attendee_user;
 CREATE ROLE insert_attendee_user NOLOGIN;
 GRANT insert_attendee_user TO lemmingpants;
+GRANT USAGE ON SCHEMA api TO insert_attendee_user;
 GRANT SELECT, INSERT ON attendee TO insert_attendee_user;
 
 DROP ROLE IF EXISTS admin_user;

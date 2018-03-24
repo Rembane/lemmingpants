@@ -14,7 +14,7 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (type (~>), Unit, Void, const, pure, show, unit, (*>), (<$), (<>), (>>>))
+import Prelude (type (~>), Unit, Void, const, pure, unit, (*>), (<$), (<>), (>>>))
 import Routing.Hash (matches)
 import Routing.Match (Match)
 import Routing.Match.Class (lit)
@@ -58,6 +58,7 @@ type State =
 data Query a
   = ChangePage  Location   a
   | LoginMsg    VL.Message a
+  | TerminalMsg VT.Message a
 
 tokenKey :: String
 tokenKey = "token"
@@ -87,32 +88,29 @@ component token =
           , HH.li_ [HH.a [HP.href "#login"]    [HH.text "Login"]]
           , HH.li_ [HH.a [HP.href "#/"]        [HH.text "Home"]]
           ]
-        , HH.p_
-          [ HH.text "Our current token:"
-          , HH.br_
-          , HH.text (show state.token)
-          ]
-        , locationToSlot state.currentLocation
+        , locationToSlot state.currentLocation state
         ])
       where
         locationToSlot
           :: Location
+          -> State
           -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
-        locationToSlot =
-          case _ of
-            Terminal -> go CP.cp1 1 VT.component (const Nothing)
-            Overhead -> go CP.cp2 2 VO.component (const Nothing)
-            Admin    -> go CP.cp3 3 VA.component (const Nothing)
-            Login    -> go CP.cp4 4 VL.component (HE.input LoginMsg)
-            Home     -> go CP.cp5 5 VH.component (const Nothing)
+        locationToSlot l s =
+          case l of
+            Terminal -> go CP.cp1 1 VT.component s.token (HE.input TerminalMsg)
+            Overhead -> go CP.cp2 2 VO.component unit    (const Nothing)
+            Admin    -> go CP.cp3 3 VA.component unit    (const Nothing)
+            Login    -> go CP.cp4 4 VL.component unit    (HE.input LoginMsg)
+            Home     -> go CP.cp5 5 VH.component unit    (const Nothing)
           where
-            go :: forall g o
+            go :: forall g i o
              . CP.ChildPath g ChildQuery Int ChildSlot
             -> Int
-            -> H.Component HH.HTML g Unit o (Aff (LemmingPantsEffects e))
+            -> H.Component HH.HTML g i o (Aff (LemmingPantsEffects e))
+            -> i
             -> (o -> Maybe (Query Unit))
             -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
-            go cp i c f = HH.slot' cp i c unit f
+            go cp p c i f = HH.slot' cp p c i f
 
     eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (LemmingPantsEffects e))
     eval =
@@ -125,5 +123,10 @@ component token =
               *> H.liftEff (setItem localStorage tokenKey t)
               *> pure next
             VL.Flash s ->
+              H.modify (_ {flash = Just s})
+              *> pure next
+        TerminalMsg m next ->
+          case m of
+            VT.Flash s ->
               H.modify (_ {flash = Just s})
               *> pure next
