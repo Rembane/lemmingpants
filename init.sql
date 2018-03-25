@@ -71,6 +71,27 @@ CREATE TABLE speaker (
 -- At most one speaker per queue may be active at the time.
 CREATE UNIQUE INDEX ON speaker (speaker_queue_id, speaking) where speaking;
 
+-- API RPC functions --------------------------------------------------------
+
+-- Returns the id of the new current agenda item if things worked out well, 0 otherwise.
+CREATE FUNCTION api.set_current_agenda_item(id INTEGER) RETURNS INTEGER
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+        n INTEGER = 0;
+    BEGIN
+        IF EXISTS(SELECT 1 FROM agenda_item WHERE agenda_item.id=set_current_agenda_item.id) THEN
+            UPDATE agenda_item SET active=FALSE;
+            UPDATE agenda_item SET active=TRUE WHERE agenda_item.id=set_current_agenda_item.id RETURNING agenda_item.id INTO n;
+            RETURN n;
+        ELSE
+            RETURN 0;
+        END IF;
+    END
+    $$;
+
+REVOKE ALL ON FUNCTION set_current_agenda_item(id INTEGER) FROM PUBLIC;
+
 -- Roles --------------------------------------------------------------------
 
 GRANT ALL PRIVILEGES ON SCHEMA api TO lemmingpants;
@@ -97,6 +118,7 @@ GRANT admin_user TO lemmingpants;
 GRANT USAGE ON SCHEMA api TO admin_user;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA api TO admin_user;
 GRANT ALL ON ALL TABLES IN SCHEMA api TO admin_user;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA api TO admin_user;
 
 -- Auth functions ------------------------------------------------------------
 
@@ -131,6 +153,9 @@ INSERT INTO role(name) VALUES('admin_user');
 
 INSERT INTO users(username, pwhash, role_id)
 SELECT 'terminal', crypt('I will indeed be back.', gen_salt('bf', 8)), id FROM role WHERE name='insert_attendee_user';
+
+INSERT INTO users(username, pwhash, role_id)
+SELECT 'hen', crypt('grawr', gen_salt('bf', 8)), id FROM role WHERE name='admin_user';
 
 SET SCHEMA 'api';
 
