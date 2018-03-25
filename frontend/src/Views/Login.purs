@@ -8,9 +8,9 @@ import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.MediaType (MediaType(..))
-import Data.Monoid (mempty)
-import Data.StrMap (StrMap, insert)
 import Effects (LemmingPantsEffects)
+import Forms as F
+import Forms.Field (mkField)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -18,65 +18,62 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax as AX
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Partial.Unsafe (unsafePartial)
-import Prelude (type (~>), Unit, bind, const, discard, pure, (*>), (<$>))
+import Prelude (type (~>), Unit, bind, const, discard, pure, unit, (*>))
 import Simple.JSON (read, writeJSON)
-import Utils (withLabel)
 
-type State = { formState :: StrMap String }
+type State = Unit
+
 data Query a
-  = UpdateField String String a
-  | SubmitForm a
+  = FormMsg F.Message a
 
 data Message
   = NewToken String
   | Flash    String
 
+
 component :: forall e. H.Component HH.HTML Query Unit Message (Aff (LemmingPantsEffects e))
 component =
-  H.component
-    { initialState: const { formState: mempty }
+  H.parentComponent
+    { initialState: const unit
     , render
     , eval
     , receiver: const Nothing
     }
   where
-    render :: State -> H.ComponentHTML Query
+    render :: State -> H.ParentHTML Query F.Query Unit (Aff (LemmingPantsEffects e))
     render state =
       HH.div_
         [ HH.h1_ [HH.text "Login"]
-        , HH.form
-          [ HE.onSubmit (HE.input_ SubmitForm) ]
-          [ withLabel UpdateField HP.InputText     true  "username" "Username"
-          , withLabel UpdateField HP.InputPassword true  "password" "Password"
-          , HH.p_
-            [ HH.input
-              [ HP.type_ HP.InputSubmit
-              , HP.value "Login!"
+        , HH.slot
+            unit
+            (F.component "Login!"
+              [ mkField "username" "Username" [HP.type_ HP.InputText,     HP.required true]
+              , mkField "password" "Password" [HP.type_ HP.InputPassword, HP.required true]
               ]
-            ]
-          ]
+            )
+            unit
+            (HE.input FormMsg)
         ]
 
-    eval :: Query ~> H.ComponentDSL State Query Message (Aff (LemmingPantsEffects e))
+    eval :: Query ~> H.HalogenM State Query F.Query Unit Message (Aff (LemmingPantsEffects e))
     eval =
       case _ of
-        UpdateField k v next ->
-          H.modify (\s -> s { formState = insert k v s.formState })
-          *> pure next
-        SubmitForm next      -> do
-          d <- writeJSON <$> H.gets (\s -> s.formState)
-          let req = AX.defaultRequest
-          r <- H.liftAff (AX.affjax (
-                 req { url     = "http://localhost:3000/rpc/login"
-                     , headers = req.headers `A.snoc` (ContentType (MediaType "application/json"))
-                     , method  = Left POST
-                     , content = Just d
-                 }))
-          case parseToken r.response of
-            Left  es -> H.raise (Flash (foldMap renderForeignError es))
-            Right ts -> let t = unsafePartial (fromJust (A.head ts))
-                         in H.raise (NewToken t.token )
-          pure next
+        FormMsg m next ->
+          case m of
+            F.FormSubmitted m' -> do
+              let req = AX.defaultRequest
+              r <- H.liftAff (AX.affjax (
+                     req { url     = "http://localhost:3000/rpc/login"
+                         , headers = req.headers `A.snoc` (ContentType (MediaType "application/json"))
+                         , method  = Left POST
+                         , content = Just (writeJSON m')
+                     }))
+              case parseToken r.response of
+                Left  es -> H.raise (Flash (foldMap renderForeignError es))
+                Right ts -> let t = unsafePartial (fromJust (A.head ts))
+                             in H.raise (NewToken t.token)
+                             *> H.raise (Flash "You are now logged in!")
+              pure next
 
       where
         parseToken :: Foreign -> Either MultipleErrors (Array { token :: String })
