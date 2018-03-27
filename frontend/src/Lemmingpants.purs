@@ -18,13 +18,13 @@ import Prelude (type (~>), Unit, Void, const, pure, unit, (*>), (<$), (<>), (>>>
 import Routing.Hash (matches)
 import Routing.Match (Match)
 import Routing.Match.Class (lit)
-import Views.Admin as VA
-import Views.Home as VH
-import Views.Login as VL
-import Views.Overhead as VO
-import Views.Terminal as VT
+import Components.Admin as CA
+import Components.Home as CH
+import Components.Login as CL
+import Components.Overhead as CO
+import Components.Terminal as CT
 
-type ChildQuery = Coproduct5 VT.Query VO.Query VA.Query VL.Query VH.Query
+type ChildQuery = Coproduct5 CT.Query CO.Query CA.Query CL.Query CH.Query
 type ChildSlot  = Either5 Int Int Int Int Int
 
 data Location
@@ -57,9 +57,9 @@ type State =
 
 data Query a
   = ChangePage  Location   a
-  | AdminMsg    VA.Message a
-  | LoginMsg    VL.Message a
-  | TerminalMsg VT.Message a
+  | AdminMsg    CA.Message a
+  | LoginMsg    CL.Message a
+  | TerminalMsg CT.Message a
 
 tokenKey :: String
 tokenKey = "token"
@@ -98,11 +98,11 @@ component token =
           -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
         locationToSlot l s =
           case l of
-            Terminal -> go CP.cp1 1 VT.component s.token (HE.input TerminalMsg)
-            Overhead -> go CP.cp2 2 VO.component unit    (const Nothing)
-            Admin    -> go CP.cp3 3 VA.component s.token (HE.input AdminMsg)
-            Login    -> go CP.cp4 4 VL.component unit    (HE.input LoginMsg)
-            Home     -> go CP.cp5 5 VH.component unit    (const Nothing)
+            Terminal -> go CP.cp1 1 CT.component s.token (HE.input TerminalMsg)
+            Overhead -> go CP.cp2 2 CO.component unit    (const Nothing)
+            Admin    -> go CP.cp3 3 CA.component s.token (HE.input AdminMsg)
+            Login    -> go CP.cp4 4 CL.component unit    (HE.input LoginMsg)
+            Home     -> go CP.cp5 5 CH.component unit    (const Nothing)
           where
             go :: forall g i o
              . CP.ChildPath g ChildQuery Int ChildSlot
@@ -119,20 +119,17 @@ component token =
         ChangePage l next -> H.modify (_ {currentLocation = l}) *> pure next
         AdminMsg   m next ->
           case m of
-            VA.Flash s -> flash s next
+            CA.Flash s -> flash s next
         LoginMsg   m next ->
           case m of
-            VL.NewToken t ->
+            CL.NewToken t ->
               H.modify (_ {token = Just t})
               *> H.liftEff (setItem localStorage tokenKey t)
               *> pure next
-            VL.Flash s -> flash s next
+            CL.Flash s -> flash s next
         TerminalMsg m next ->
           case m of
-            VT.Flash s -> flash s next
-
-
-
+            CT.Flash s -> flash s next
       where
         flash s next =
           H.modify (_ {flash = Just s})

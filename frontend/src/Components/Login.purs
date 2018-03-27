@@ -1,4 +1,4 @@
-module Views.Login where
+module Components.Login where
 
 import Control.Monad.Aff (Aff)
 import Data.Array as A
@@ -7,8 +7,8 @@ import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
 import Data.Maybe (Maybe(..), fromJust)
 import Effects (LemmingPantsEffects)
-import Forms as F
-import Forms.Field (mkField)
+import Components.Forms as F
+import Components.Forms.Field (mkField)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE

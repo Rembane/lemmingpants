@@ -1,4 +1,4 @@
-module Views.Overhead where
+module Components.Home where
 
 import Data.Maybe (Maybe(..))
 import Halogen as H
@@ -9,7 +9,7 @@ type State = Int
 data Query a = Query a
 
 title :: String
-title = "Overhead"
+title = "Home"
 
 component :: forall m. H.Component HH.HTML Query Unit Void m
 component =
@@ -22,7 +22,7 @@ component =
   where
     render :: State -> H.ComponentHTML Query
     render state =
-      HH.p_ [HH.text "Overhead! :D"]
+      HH.p_ [HH.text "Home! :D"]
 
     eval :: Query ~> H.ComponentDSL State Query Void m
     eval =

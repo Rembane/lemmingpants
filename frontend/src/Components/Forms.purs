@@ -1,4 +1,4 @@
-module Forms where
+module Components.Forms where
 
 import Control.Monad.Aff (Aff)
 import DOM.Event.Event (Event, preventDefault)
@@ -8,7 +8,7 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap as SM
 import Data.Tuple (Tuple(..))
 import Effects (LemmingPantsEffects)
-import Forms.Field as F
+import Components.Forms.Field as F
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE

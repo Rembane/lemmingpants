@@ -1,4 +1,4 @@
-module Views.Terminal where
+module Components.Terminal where
 
 import Control.Monad.Aff (Aff)
 import Data.Either (Either(..))
@@ -6,8 +6,8 @@ import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.StrMap (lookup)
 import Debug.Trace (traceA, traceAnyA)
 import Effects (LemmingPantsEffects)
-import Forms as F
-import Forms.Field (mkField)
+import Components.Forms as F
+import Components.Forms.Field (mkField)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE

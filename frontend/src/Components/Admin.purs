@@ -1,4 +1,4 @@
-module Views.Admin where
+module Components.Admin where
 
 import Types
 

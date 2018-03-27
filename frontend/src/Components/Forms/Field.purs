@@ -1,4 +1,4 @@
-module Forms.Field
+module Components.Forms.Field
   ( mkField
   , FieldComponent
   , Query(..)
