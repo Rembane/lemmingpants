@@ -2,9 +2,7 @@ module Views.Terminal where
 
 import Control.Monad.Aff (Aff)
 import Data.Either (Either(..))
-import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
-import Data.MediaType (MediaType(..))
 import Data.StrMap (lookup)
 import Debug.Trace (traceA, traceAnyA)
 import Effects (LemmingPantsEffects)
@@ -14,11 +12,9 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Network.HTTP.Affjax as AX
-import Network.HTTP.RequestHeader (RequestHeader(..))
 import Network.HTTP.StatusCode (StatusCode(..))
+import Postgrest as PG
 import Prelude (type (~>), Unit, bind, discard, pure, unit, (*>), (<>))
-import Simple.JSON (writeJSON)
 
 type State = { token :: Maybe String }
 
@@ -30,8 +26,6 @@ data Query a
 type Input = Maybe String
 
 data Message = Flash String
-
--- TODO: Form library!
 
 component :: forall e. H.Component HH.HTML Query Input Message (Aff (LemmingPantsEffects e))
 component =
@@ -69,22 +63,12 @@ component =
             case m of
               F.FormSubmitted m' -> do
                 token <- H.gets (\s -> s.token)
-                case token of
-                  Nothing -> H.raise (Flash "You are not logged in. Please login.")
-                  Just t  -> do
-                    let req = AX.defaultRequest
-                    r <- H.liftAff (AX.affjax (
-                           req { url     = "http://localhost:3000/attendee"
-                               , headers =
-                                   req.headers <>
-                                     [ ContentType (MediaType "application/json")
-                                     , RequestHeader "Authorization" ("Bearer " <> t)
-                                     ]
-                               , method  = Left POST
-                               , content = Just (writeJSON m')
-                               }))
-                    -- The Location-header contains the new Attendee URL.
+                er    <- H.liftAff (PG.withSignedIn "http://localhost:3000/attendee" token m')
+                case er of
+                  Left es -> H.raise (Flash es)
+                  Right r ->
                     case r.status of
+                      -- The Location-header contains the new Attendee URL.
                       StatusCode 201 -> do -- The `Created` HTTP status code.
                         H.raise (Flash ("Thank you for registering, " <> fromMaybe "ERROR! EXTERMINATE!" (lookup "name" m')))
                       _ ->

@@ -7,18 +7,17 @@ import Data.Array as A
 import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
-import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.MediaType (MediaType(..))
 import Data.Monoid (mempty)
+import Data.StrMap as SM
 import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Network.HTTP.Affjax as AX
-import Network.HTTP.RequestHeader (RequestHeader(..))
 import Prelude (type (~>), Unit, bind, const, pure, show, (*>), (+), (-), (<$>), (<>), (>), (>>=))
-import Simple.JSON (read, readJSON, writeJSON)
+import Postgrest as PG
+import Simple.JSON (read, readJSON)
 
 type State =
   { agendaItems   :: Array (AgendaItem)
@@ -91,23 +90,14 @@ component =
         setCurrentAgendaItem :: (Int -> Int) -> H.ComponentDSL State Query Message (Aff (LemmingPantsEffects e)) Unit
         setCurrentAgendaItem f = do
           s <- H.get
-          case s.token of
-            Nothing -> H.raise (Flash "You are not logged in. Please login.")
-            Just t  ->
-              case A.index s.agendaItems (f s.currAgendaIdx) of
-                Nothing             -> H.raise (Flash ("NO AGENDA ITEMS AT INDEX: " <> show (f s.currAgendaIdx)))
-                Just (AgendaItem a) -> do
-                  let req = AX.defaultRequest
-                  r <- H.liftAff (AX.affjax (
-                         req { url     = "http://localhost:3000/rpc/set_current_agenda_item"
-                             , headers =
-                                 req.headers <>
-                                   [ ContentType (MediaType "application/json")
-                                   , RequestHeader "Authorization" ("Bearer " <> t)
-                                   ]
-                             , method  = Left POST
-                             , content = Just (writeJSON ({ "id" : a.id }))
-                             }))
+          case A.index s.agendaItems (f s.currAgendaIdx) of
+            Nothing             ->
+              H.raise (Flash ("NO AGENDA ITEMS AT INDEX: " <> show (f s.currAgendaIdx)))
+            Just (AgendaItem a) -> do
+              er <- H.liftAff (PG.withSignedIn "http://localhost:3000/rpc/set_current_agenda_item" s.token (SM.singleton "id" (show a.id)))
+              case er of
+                Left  m -> H.raise (Flash m)
+                Right r -> do
                   case readJSON r.response of
                     Left es -> H.raise (Flash (foldMap renderForeignError es))
                     Right i ->

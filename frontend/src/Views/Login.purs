@@ -5,9 +5,7 @@ import Data.Array as A
 import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
-import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
-import Data.MediaType (MediaType(..))
 import Effects (LemmingPantsEffects)
 import Forms as F
 import Forms.Field (mkField)
@@ -15,11 +13,10 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Network.HTTP.Affjax as AX
-import Network.HTTP.RequestHeader (RequestHeader(..))
 import Partial.Unsafe (unsafePartial)
+import Postgrest as PG
 import Prelude (type (~>), Unit, bind, const, discard, pure, unit, (*>))
-import Simple.JSON (read, writeJSON)
+import Simple.JSON (read)
 
 type State = Unit
 
@@ -61,13 +58,7 @@ component =
         FormMsg m next ->
           case m of
             F.FormSubmitted m' -> do
-              let req = AX.defaultRequest
-              r <- H.liftAff (AX.affjax (
-                     req { url     = "http://localhost:3000/rpc/login"
-                         , headers = req.headers `A.snoc` (ContentType (MediaType "application/json"))
-                         , method  = Left POST
-                         , content = Just (writeJSON m')
-                     }))
+              r <- H.liftAff (PG.post "http://localhost:3000/rpc/login" m')
               case parseToken r.response of
                 Left  es -> H.raise (Flash (foldMap renderForeignError es))
                 Right ts -> let t = unsafePartial (fromJust (A.head ts))
