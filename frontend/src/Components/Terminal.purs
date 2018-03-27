@@ -1,13 +1,15 @@
 module Components.Terminal where
 
+import Components.Forms as F
+import Components.Forms.Field (mkField)
 import Control.Monad.Aff (Aff)
 import Data.Either (Either(..))
+import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
+import Data.Monoid (mempty)
 import Data.StrMap (lookup)
 import Debug.Trace (traceA, traceAnyA)
 import Effects (LemmingPantsEffects)
-import Components.Forms as F
-import Components.Forms.Field (mkField)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -63,7 +65,7 @@ component =
             case m of
               F.FormSubmitted m' -> do
                 token <- H.gets (\s -> s.token)
-                er    <- H.liftAff (PG.withSignedIn "http://localhost:3000/attendee" token m')
+                er    <- H.liftAff (PG.signedInAjax "http://localhost:3000/attendee" token POST mempty m')
                 case er of
                   Left es -> H.raise (Flash es)
                   Right r ->

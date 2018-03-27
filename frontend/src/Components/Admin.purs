@@ -2,106 +2,150 @@ module Components.Admin where
 
 import Types
 
+import Components.SpeakerQueue as SQ
 import Control.Monad.Aff (Aff)
-import Data.Array as A
-import Data.Either (Either(..))
+import Data.Either (Either(..), either, note)
 import Data.Foldable (foldMap)
-import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Foreign (renderForeignError)
+import Data.HTTP.Method (Method(..))
+import Data.Map as M
+import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Monoid (mempty)
-import Data.StrMap as SM
+import Data.Sequence.Ordered as OrdSeq
+import Data.Tuple (snd)
+import Debug.Trace (trace, traceShowA)
 import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Network.HTTP.Affjax as AX
-import Prelude (type (~>), Unit, bind, const, pure, show, (*>), (+), (-), (<$>), (<>), (>), (>>=))
 import Postgrest as PG
-import Simple.JSON (read, readJSON)
+import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<<<), (<>), (==), (>>=))
+import Queue as Q
+import Simple.JSON (readJSON)
 
 type State =
-  { agendaItems   :: Array (AgendaItem)
-  , currAgendaIdx :: Int -- ^ The index of the current agenda item. It is 0 if none is active. Which is a potential bug.
-  , token         :: Maybe String
+  { agenda    :: Q.Queue AgendaItem
+  , token     :: Maybe String
+  , attendees :: M.Map Int Attendee
   }
+type Input = State
 
 data Query a
-  = Initialize a
-  | Finalize   a
-  | Previous   a
-  | Next       a
+  = PreviousAI       a
+  | NextAI           a
+  | SQMsg SQ.Message a
 
 data Message
   = Flash String
 
-component :: forall e. H.Component HH.HTML Query (Maybe String) Message (Aff (LemmingPantsEffects e))
+component :: forall e. H.Component HH.HTML Query Input Message (Aff (LemmingPantsEffects e))
 component =
-  H.lifecycleComponent
-    { initialState: \i -> {agendaItems: mempty, currAgendaIdx: 0, token: i }
+  H.parentComponent
+    { initialState: \{token, agenda, attendees} ->
+        { agenda:    agenda
+        , token:     token
+        , attendees: attendees
+        }
     , render
     , eval
-    , initializer: Just (H.action Initialize)
-    , finalizer: Just (H.action Finalize)
     , receiver: const Nothing
     }
   where
-    render :: State -> H.ComponentHTML Query
+    render :: State -> H.ParentHTML Query SQ.Query Unit (Aff (LemmingPantsEffects e))
     render state =
       HH.div_
-        [ HH.h1_ [HH.text "Supreme council interface"]
+        ([ HH.h1_ [HH.text "Supreme council interface"]
         , HH.h2_
           [ HH.button
-            [ HE.onClick (HE.input_ Previous) ]
+            [ HE.onClick (HE.input_ PreviousAI) ]
             [ HH.text "⇐" ]
           , HH.text " "
-          , HH.text (fromMaybe "OUT OF INDEX EXCEPTION!!!" ((\(AgendaItem a) -> a.title) <$> A.index state.agendaItems state.currAgendaIdx))
+          , HH.text (either id id (map (\(AgendaItem a) -> a.title) currentAI))
           , HH.text " "
           , HH.button
-            [ HE.onClick (HE.input_ Next) ]
+            [ HE.onClick (HE.input_ NextAI) ]
             [ HH.text "⇒" ]
           ]
-        ]
+        ] <> either
+            (const [HH.text "No agenda item => no speaker queue."])
+            (\(AgendaItem ai) ->
+              [ HH.p_ [ HH.text ("Speaker queue stack height: " <> show (OrdSeq.length ai.speakerQueues)) ]
+              , case OrdSeq.greatest ai.speakerQueues of
+                  Nothing -> HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
+                  Just sq ->
+                    HH.slot
+                      unit
+                      SQ.component
+                      { speakerQueue: sq, token: state.token, attendees: state.attendees, agendaItemId: ai.id }
+                      (HE.input SQMsg)
+              ])
+            currentAI
+        )
+      where
+        currentAI = getCurrentAI state.agenda
 
-    eval :: Query ~> H.ComponentDSL State Query Message (Aff (LemmingPantsEffects e))
+    eval :: Query ~> H.ParentDSL State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e))
     eval =
       case _ of
-        Initialize next ->
-           (H.liftAff ((\r -> parseAgendaItem r.response) <$> AX.get "http://localhost:3000/agenda_item?order=order_.asc")
-           >>= \as ->
-               case as of
-                 Left  es  -> H.raise (Flash (foldMap renderForeignError es))
-                 Right as' -> let i = fromMaybe 0 (A.findIndex (\(AgendaItem a) -> a.active) as')
-                               in H.modify (_ { agendaItems = as', currAgendaIdx = i })
-           )
-           *> pure next
-        Finalize next ->
-          pure next
-        Previous next ->
-          setCurrentAgendaItem (_-1)
+        PreviousAI next ->
+          (H.gets (\s -> s.agenda) >>= stepQueue Q.prev) *> pure next
+        NextAI next ->
+          (H.gets (\s -> s.agenda) >>= stepQueue Q.next) *> pure next
+        SQMsg m next ->
+          case m of
+            SQ.Flash m' ->
+              H.raise (Flash m')
+            SQ.Push  sq ->
+              modifyCurrentAI (\(AgendaItem a) -> AgendaItem (a { speakerQueues = OrdSeq.insert sq a.speakerQueues }))
+            SQ.Pop      ->
+              modifyCurrentAI (\(AgendaItem a) -> AgendaItem (a { speakerQueues = maybe mempty snd (OrdSeq.popGreatest a.speakerQueues) }))
+            SQ.ModifiedTop sq ->
+              modifyCurrentAI (\(AgendaItem a) ->
+                trace ("sq: " <> show sq <> "\n" <> show (OrdSeq.popGreatest a.speakerQueues)) (\_ ->
+                AgendaItem (a { speakerQueues = OrdSeq.insert sq (maybe mempty snd (OrdSeq.popGreatest a.speakerQueues)) })))
+              *> H.gets (\s -> s.agenda) >>= traceShowA
           *> pure next
-        Next next ->
-          setCurrentAgendaItem (_+1)
-          *> pure next
 
-      where
-        parseAgendaItem :: Foreign -> Either MultipleErrors (Array AgendaItem)
-        parseAgendaItem = read
+    getCurrentAI :: Q.Queue AgendaItem -> Either String AgendaItem
+    getCurrentAI =
+      note "ERROR: There is no current agenda item." <<< Q.getCurrent
 
-        setCurrentAgendaItem :: (Int -> Int) -> H.ComponentDSL State Query Message (Aff (LemmingPantsEffects e)) Unit
-        setCurrentAgendaItem f = do
-          s <- H.get
-          case A.index s.agendaItems (f s.currAgendaIdx) of
-            Nothing             ->
-              H.raise (Flash ("NO AGENDA ITEMS AT INDEX: " <> show (f s.currAgendaIdx)))
-            Just (AgendaItem a) -> do
-              er <- H.liftAff (PG.withSignedIn "http://localhost:3000/rpc/set_current_agenda_item" s.token (SM.singleton "id" (show a.id)))
-              case er of
-                Left  m -> H.raise (Flash m)
-                Right r -> do
-                  case readJSON r.response of
-                    Left es -> H.raise (Flash (foldMap renderForeignError es))
-                    Right i ->
-                      if i > 0
-                        then H.modify (_ {currAgendaIdx = f s.currAgendaIdx })
-                        else H.raise (Flash "OUT OF INDEX ERROR! Or something equally terrible.")
+    modifyCurrentAI
+      :: (AgendaItem -> AgendaItem)
+      -> H.HalogenM State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e)) Unit
+    modifyCurrentAI f = H.modify (\s -> s { agenda = Q.modifyCurrent f s.agenda })
 
+    stepQueue
+      :: (Q.Queue AgendaItem -> Q.Queue AgendaItem)
+      -> Q.Queue AgendaItem
+      -> H.HalogenM State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e)) Unit
+    stepQueue f q =
+      let q' = f q
+       in if q == q'
+            then pure unit
+            else setCurrentAgendaItem q'
+
+    setCurrentAgendaItem
+      :: Q.Queue AgendaItem
+      -> H.HalogenM State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e)) Unit
+    setCurrentAgendaItem newQueue =
+      case getCurrentAI newQueue of
+        Left s ->
+          H.raise (Flash s)
+        Right (AgendaItem c) -> do
+          s  <- H.get
+          er <- H.liftAff (PG.signedInAjax
+                  "http://localhost:3000/rpc/set_current_agenda_item"
+                  s.token
+                  POST
+                  mempty
+                  {id: c.id})
+          case er of
+            Left  m -> H.raise (Flash m)
+            Right r -> do
+              case readJSON r.response of
+                Left es -> H.raise (Flash (foldMap renderForeignError es))
+                Right i' ->
+                  if i' == c.id
+                    then H.modify (_ {agenda = newQueue })
+                    else H.raise (Flash ("The backend didn't set the wanted agenda item as the current agenda item. This is very strange. Wanted ID: " <> show c.id <> ", actual ID: " <> show i'))
