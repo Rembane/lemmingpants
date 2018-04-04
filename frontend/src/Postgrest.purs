@@ -9,9 +9,8 @@ module Postgrest
 import Control.Monad.Aff (Aff)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(Just, Nothing))
 import Data.MediaType (MediaType(..))
-import Data.StrMap (StrMap)
 import Data.Traversable (traverse)
 import Network.HTTP.Affjax (AJAX)
 import Network.HTTP.Affjax as AX
@@ -34,10 +33,11 @@ pgrequest url d = AX.defaultRequest
   }
 
 post
-  :: forall a e
+  :: forall a d e
    . Respondable a
+  => WriteForeign d
   => String
-  -> StrMap String
+  -> d
   -> Aff (ajax :: AJAX | e) (AX.AffjaxResponse a)
 post url d = AX.affjax ((pgrequest url d) { method = Left POST })
 

@@ -1,16 +1,22 @@
 module Main where
 
 import Browser.WebStorage (getItem, localStorage)
+import Control.Coroutine as CR
 import Control.Monad.Aff (Aff, liftEff', parallel, sequential)
+import Control.Monad.Aff.Console (logShow)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 import Control.Monad.Eff.Exception (throw)
+import Coroutines (consumerToQuery, routeProducer)
+import DOM.Websocket.WebSocket as WS
+import Data.Array as A
 import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
 import Data.List as L
 import Data.Map as M
+import Data.Maybe (Maybe(Just, Nothing), isJust)
 import Data.Tuple (Tuple(..))
 import Debug.Trace (traceA)
 import Effects (LemmingPantsEffects)
@@ -18,10 +24,12 @@ import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
 import Lemmingpants as LP
 import Network.HTTP.Affjax as AX
-import Prelude (class Semigroup, Unit, bind, discard, map, pure, void, (*>), (<$>), (<*>), (<>), (==))
+import Postgrest as PG
+import Prelude (class Semigroup, Unit, bind, discard, map, pure, (*>), (<$>), (<*>), (<>), (==))
 import Queue as Q
 import Simple.JSON (read)
 import Types (AgendaItem(..), Attendee(..))
+import Websockets (wsProducer)
 
 parseAgenda :: Foreign -> Either MultipleErrors (Array AgendaItem)
 parseAgenda = read
@@ -57,8 +65,28 @@ main :: forall e. Eff (LemmingPantsEffects (console :: CONSOLE | e)) Unit
 main = do
   log "Hello lemming!"
   HA.runHalogenAff do
-    body   <- HA.awaitBody
-    st     <- loadInitialState
-    driver <- runUI LP.component st body
-    void (liftEff (LP.routeSignal driver))
+    body <- HA.awaitBody
+    st   <- loadInitialState
+    t    <- if isJust st.token
+              then pure st.token
+              else getToken
+    case t of
+      Nothing -> liftEff' (log "Couldn't get a token! :(")
+      Just t' -> do
+        connection <- liftEff (WS.create (WS.URL ("ws://localhost:8000/notifications/" <> t')) [])
+        driver     <- runUI LP.component (st { token = Just t' }) body
+        CR.runProcess (
+          CR.connect
+            (CR.joinProducers (wsProducer connection) (routeProducer LP.locations))
+            (CR.joinConsumers (consumerToQuery driver.query LP.WSMsg) (consumerToQuery driver.query LP.ChangePage))
+        )
+  where
+    parseToken :: Foreign -> Either MultipleErrors (Array { token :: String })
+    parseToken = read
 
+    getToken :: Aff (LemmingPantsEffects (console :: CONSOLE | e)) (Maybe String)
+    getToken = do
+      r <- PG.post "http://localhost:3000/rpc/get_token" ""
+      case parseToken r.response of
+        Left  es -> logShow (foldMap renderForeignError es) *> pure Nothing
+        Right ts -> pure (map (\t -> t.token) (A.head ts))

@@ -1,20 +1,26 @@
 module Components.Overhead where
 
+import Types
+
 import Data.Maybe (Maybe(..))
 import Halogen as H
 import Halogen.HTML as HH
-import Prelude (type (~>), Unit, Void, const, pure)
+import Prelude (type (~>), Void, const, id, pure)
 
-type State = Int
+type State =
+  { pageTitle :: String
+  }
+type Input = State
+
 data Query a = Query a
 
 title :: String
 title = "Overhead"
 
-component :: forall m. H.Component HH.HTML Query Unit Void m
+component :: forall m. H.Component HH.HTML Query Input Void m
 component =
   H.component
-    { initialState: const 0
+    { initialState: id
     , render
     , eval
     , receiver: const Nothing

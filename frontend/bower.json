@@ -17,7 +17,9 @@
     "purescript-webstorage": "^3.0.1",
     "purescript-record-show": "^0.4.0",
     "purescript-string-parsers": "^3.1.0",
-    "purescript-sequences": "^1.0.3"
+    "purescript-sequences": "^1.0.3",
+    "purescript-coroutines": "^4.0.0",
+    "purescript-aff-coroutines": "^6.0.0"
   },
   "devDependencies": {
     "purescript-debug": "^3.0.0",

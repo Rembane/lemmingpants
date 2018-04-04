@@ -7,22 +7,20 @@ import Components.Login as CL
 import Components.Overhead as CO
 import Components.Terminal as CT
 import Control.Alt ((<|>))
-import Control.Monad.Aff (Aff, launchAff_)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.Console (log)
 import Data.Either.Nested (Either5)
 import Data.Functor.Coproduct.Nested (Coproduct5)
 import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Effects (LemmingPantsEffects)
 import Halogen as H
-import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (type (~>), Unit, Void, const, pure, unit, (*>), (<$), (<>), (>>>))
+import Prelude (type (~>), Unit, Void, const, pure, unit, (*>), (<$), (<>))
 import Queue as Q
-import Routing.Hash (matches)
 import Routing.Match (Match)
 import Routing.Match.Class (lit)
 import Types (AgendaItem, Attendee)
@@ -45,13 +43,6 @@ locations
   <|> (Login    <$ lit "login")
   <|> (Home     <$ lit "")
 
-routeSignal
-  :: forall o e
-   . H.HalogenIO Query o (Aff (HA.HalogenEffects e))
-  -> Eff (HA.HalogenEffects e) (Eff (HA.HalogenEffects e) Unit)
-routeSignal driver
-  = matches locations (\_ -> ChangePage >>> H.action >>> driver.query >>> launchAff_)
-
 type State =
   { currentLocation :: Location
   , token           :: Maybe String
@@ -65,6 +56,7 @@ data Query a
   | AdminMsg    CA.Message a
   | LoginMsg    CL.Message a
   | TerminalMsg CT.Message a
+  | WSMsg       String     a
 
 tokenKey :: String
 tokenKey = "token"
@@ -113,7 +105,7 @@ component =
         locationToSlot l s =
           case l of
             Terminal -> go CP.cp1 1 CT.component s.token (HE.input TerminalMsg)
-            Overhead -> go CP.cp2 2 CO.component unit    (const Nothing)
+            Overhead -> go CP.cp2 2 CO.component ttl     (const Nothing)
             Admin    -> go CP.cp3 3 CA.component s'      (HE.input AdminMsg)
             Login    -> go CP.cp4 4 CL.component unit    (HE.input LoginMsg)
             Home     -> go CP.cp5 5 CH.component unit    (const Nothing)
@@ -128,6 +120,8 @@ component =
             go cp p c i f = HH.slot' cp p c i f
 
             s' = { token: s.token, agenda: s.agenda, attendees: s.attendees }
+
+            ttl = { pageTitle : ":D :D :D" }
 
     eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (LemmingPantsEffects e))
     eval =
@@ -146,6 +140,9 @@ component =
         TerminalMsg m next ->
           case m of
             CT.Flash s -> flash s next
+        WSMsg s next ->
+          H.liftAff (log s)
+          *> pure next
       where
         flash s next =
           H.modify (_ {flash = Just s})

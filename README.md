@@ -13,7 +13,8 @@ Install the programs below and rock on!
 - Postgrest https://github.com/begriffs/postgrest
 - Postgresql
 - PGJWT: https://github.com/michelp/pgjwt
-- A web server of your choice
+- postgres-websockets https://github.com/diogob/postgres-websockets
+- A web server of your choice (example configurations for NGINX are in the pipeline)
 
 ### Initialize the database
 

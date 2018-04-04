@@ -7,10 +7,6 @@ trap "exit" INT TERM ERR
 trap "kill 0" EXIT
 
 postgrest lemmingpants.conf &
-
-{
-    cd static/
-    python -m http.server 8000 &
-}
+postgres-websockets websockets.conf &
 
 wait
