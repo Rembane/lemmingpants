@@ -2,7 +2,7 @@ module Main where
 
 import Browser.WebStorage (getItem, localStorage)
 import Control.Coroutine as CR
-import Control.Monad.Aff (Aff, liftEff', parallel, sequential)
+import Control.Monad.Aff (Aff, forkAff, liftEff', parallel, sequential)
 import Control.Monad.Aff.Console (logShow)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
@@ -25,7 +25,7 @@ import Halogen.VDom.Driver (runUI)
 import Lemmingpants as LP
 import Network.HTTP.Affjax as AX
 import Postgrest as PG
-import Prelude (class Semigroup, Unit, bind, discard, map, pure, (*>), (<$>), (<*>), (<>), (==))
+import Prelude (class Semigroup, Unit, bind, discard, map, pure, void, (*>), (<$>), (<*>), (<<<), (<>), (==))
 import Queue as Q
 import Simple.JSON (read)
 import Types (AgendaItem(..), Attendee(..))
@@ -75,11 +75,8 @@ main = do
       Just t' -> do
         connection <- liftEff (WS.create (WS.URL ("ws://localhost:8000/notifications/" <> t')) [])
         driver     <- runUI LP.component (st { token = Just t' }) body
-        CR.runProcess (
-          CR.connect
-            (CR.joinProducers (wsProducer connection) (routeProducer LP.locations))
-            (CR.joinConsumers (consumerToQuery driver.query LP.WSMsg) (consumerToQuery driver.query LP.ChangePage))
-        )
+        pfest (wsProducer connection)      (consumerToQuery driver.query LP.WSMsg)
+        pfest (routeProducer LP.locations) (consumerToQuery driver.query LP.ChangePage)
   where
     parseToken :: Foreign -> Either MultipleErrors (Array { token :: String })
     parseToken = read
@@ -90,3 +87,10 @@ main = do
       case parseToken r.response of
         Left  es -> logShow (foldMap renderForeignError es) *> pure Nothing
         Right ts -> pure (map (\t -> t.token) (A.head ts))
+
+pfest
+  :: forall a e
+   . CR.Producer a (Aff (LemmingPantsEffects e)) Unit
+  -> CR.Consumer a (Aff (LemmingPantsEffects e)) Unit
+  -> Aff           (LemmingPantsEffects e) Unit
+pfest a = void <<< forkAff <<< CR.runProcess <<< CR.connect a
