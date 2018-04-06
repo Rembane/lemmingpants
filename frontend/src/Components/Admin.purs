@@ -13,18 +13,20 @@ import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Monoid (mempty)
 import Data.Sequence.Ordered as OrdSeq
 import Data.Tuple (snd)
-import Debug.Trace (trace, traceShowA)
 import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<<<), (<>), (==), (>>=))
+import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<#>), (<<<), (<>), (==), (>>=))
+import Queue (modifyCurrent)
 import Queue as Q
 import Simple.JSON (readJSON)
 
+type Agenda = Q.Queue AgendaItem
+
 type State =
-  { agenda    :: Q.Queue AgendaItem
+  { agenda    :: Agenda
   , token     :: Maybe String
   , attendees :: M.Map Int Attendee
   }
@@ -36,7 +38,8 @@ data Query a
   | SQMsg SQ.Message a
 
 data Message
-  = Flash String
+  = Flash          String
+  | ModifiedAgenda Agenda
 
 component :: forall e. H.Component HH.HTML Query Input Message (Aff (LemmingPantsEffects e))
 component =
@@ -96,24 +99,25 @@ component =
             SQ.Flash m' ->
               H.raise (Flash m')
             SQ.Push  sq ->
-              modifyCurrentAI (\(AgendaItem a) -> AgendaItem (a { speakerQueues = OrdSeq.insert sq a.speakerQueues }))
+              H.gets (\s -> s.agenda)
+                <#> modifyCurrent
+                  (\(AgendaItem a) -> AgendaItem (a { speakerQueues = OrdSeq.insert sq a.speakerQueues }))
+                >>= (H.raise <<< ModifiedAgenda)
             SQ.Pop      ->
-              modifyCurrentAI (\(AgendaItem a) -> AgendaItem (a { speakerQueues = maybe mempty snd (OrdSeq.popGreatest a.speakerQueues) }))
+              H.gets (\s -> s.agenda)
+                <#> modifyCurrent
+                  (\(AgendaItem a) -> AgendaItem (a { speakerQueues = maybe mempty snd (OrdSeq.popGreatest a.speakerQueues) }))
+                >>= (H.raise <<< ModifiedAgenda)
             SQ.ModifiedTop sq ->
-              modifyCurrentAI (\(AgendaItem a) ->
-                trace ("sq: " <> show sq <> "\n" <> show (OrdSeq.popGreatest a.speakerQueues)) (\_ ->
-                AgendaItem (a { speakerQueues = OrdSeq.insert sq (maybe mempty snd (OrdSeq.popGreatest a.speakerQueues)) })))
-              *> H.gets (\s -> s.agenda) >>= traceShowA
+              H.gets (\s -> s.agenda)
+                <#> modifyCurrent (\(AgendaItem a) ->
+                  AgendaItem (a { speakerQueues = OrdSeq.insert sq (maybe mempty snd (OrdSeq.popGreatest a.speakerQueues)) }))
+                >>= (H.raise <<< ModifiedAgenda)
           *> pure next
 
     getCurrentAI :: Q.Queue AgendaItem -> Either String AgendaItem
     getCurrentAI =
       note "ERROR: There is no current agenda item." <<< Q.getCurrent
-
-    modifyCurrentAI
-      :: (AgendaItem -> AgendaItem)
-      -> H.HalogenM State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e)) Unit
-    modifyCurrentAI f = H.modify (\s -> s { agenda = Q.modifyCurrent f s.agenda })
 
     stepQueue
       :: (Q.Queue AgendaItem -> Q.Queue AgendaItem)

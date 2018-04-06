@@ -73,7 +73,7 @@ main = do
     case t of
       Nothing -> liftEff' (log "Couldn't get a token! :(")
       Just t' -> do
-        connection <- liftEff (WS.create (WS.URL ("ws://localhost:8000/notifications/" <> t')) [])
+        connection <- liftEff (WS.create (WS.URL ("ws://localhost:8000/state_updates/" <> t')) [])
         driver     <- runUI LP.component (st { token = Just t' }) body
         pfest (wsProducer connection)      (consumerToQuery driver.query LP.WSMsg)
         pfest (routeProducer LP.locations) (consumerToQuery driver.query LP.ChangePage)

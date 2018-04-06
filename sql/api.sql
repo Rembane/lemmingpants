@@ -121,6 +121,35 @@ CREATE TRIGGER only_update_top_speakerqueue
     FOR EACH ROW
     EXECUTE PROCEDURE check_if_top_speakerqueue();
 
+CREATE FUNCTION websocket_news() RETURNS TRIGGER
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        PERFORM model.send_websocket_notification(LOWER(TG_TABLE_NAME) || '_' || LOWER(TG_OP), row_to_json(NEW));
+        RETURN NEW;
+    END
+    $$;
+
+CREATE TRIGGER speaker_queue_news
+    AFTER UPDATE OR INSERT ON speaker_queue
+    FOR EACH ROW
+    EXECUTE PROCEDURE websocket_news();
+
+CREATE TRIGGER speaker_news
+    AFTER INSERT OR UPDATE ON speaker
+    FOR EACH ROW
+    EXECUTE PROCEDURE websocket_news();
+
+CREATE TRIGGER agenda_item_news
+    AFTER INSERT OR UPDATE ON agenda_item
+    FOR EACH ROW
+    EXECUTE PROCEDURE websocket_news();
+
+CREATE TRIGGER attendee_news
+    AFTER INSERT OR UPDATE ON attendee
+    FOR EACH ROW
+    EXECUTE PROCEDURE websocket_news();
+
 -- API RPC functions --------------------------------------------------------
 
 -- Returns the id of the new current agenda item if things worked out well, 0 otherwise.
@@ -191,7 +220,8 @@ CREATE FUNCTION api.get_token() RETURNS jwt_token
   LANGUAGE sql SECURITY DEFINER SET search_path = api, model, public, pg_temp
   AS $$
     -- Sign encrypts using HS256 by default.
-    SELECT sign(json_build_object('role', 'web_anon', 'exp', extract(EPOCH FROM NOW())::INTEGER + 3600, 'mode', 'r'), current_setting('app.jwt_secret')) AS token;
+    SELECT sign(json_build_object('role', 'web_anon', 'exp', extract(EPOCH FROM NOW())::INTEGER + 3600, 'mode', 'r'),
+        current_setting('app.jwt_secret')) AS token;
   $$;
 
 REVOKE ALL ON FUNCTION get_token() FROM PUBLIC;

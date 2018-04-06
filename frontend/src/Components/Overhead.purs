@@ -12,7 +12,7 @@ type State =
   }
 type Input = State
 
-data Query a = Query a
+data Query a = GotStateUpdate String a
 
 title :: String
 title = "Overhead"
@@ -33,5 +33,5 @@ component =
     eval :: Query ~> H.ComponentDSL State Query Void m
     eval =
       case _ of
-        Query next -> pure next
+        GotStateUpdate s next -> pure next
 
