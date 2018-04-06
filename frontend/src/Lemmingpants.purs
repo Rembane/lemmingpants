@@ -9,25 +9,39 @@ import Components.Terminal as CT
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
+import Control.Monad.Except (except, runExcept)
+import Data.Array as A
+import Data.Either (Either(..), note)
 import Data.Either.Nested (Either5)
+import Data.Foldable (foldMap)
+import Data.Foreign (F, Foreign, ForeignError(..), fail, renderForeignError)
 import Data.Functor.Coproduct.Nested (Coproduct5)
 import Data.Map as M
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe)
+import Data.Monoid (mempty)
 import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (type (~>), Unit, Void, const, pure, unit, (*>), (<#>), (<$), (<>))
-import Queue as Q
+import Prelude (type (~>), Unit, Void, const, pure, unit, ($), (*>), (/=), (<#>), (<$), (<>), (=<<), (==), (>>=))
 import Routing.Match (Match)
 import Routing.Match.Class (lit)
-import Simple.JSON (readJSON')
-import Types (AgendaItem, Attendee)
+import Simple.JSON (readImpl, readJSON')
+import Types.Agenda (Agenda, AgendaItem(..))
+import Types.Agenda as AG
+import Types.Attendee (Attendee(..))
+import Types.Speaker (Speaker(..))
+import Types.SpeakerQueue (SpeakerQueue(..))
+import Types.Websocket (WSMsg)
 
 type ChildQuery = Coproduct5 CT.Query CO.Query CA.Query CL.Query CH.Query
 type ChildSlot  = Either5 Int Int Int Int Int
+
+data WSAction
+  = Insert
+  | Update
 
 data Location
   = Home
@@ -48,7 +62,7 @@ type State =
   { currentLocation :: Location
   , token           :: Maybe String
   , flash           :: Maybe String
-  , agenda          :: Q.Queue AgendaItem
+  , agenda          :: Agenda
   , attendees       :: M.Map Int Attendee
   }
 
@@ -62,7 +76,7 @@ data Query a
 tokenKey :: String
 tokenKey = "token"
 
-type Input = { token :: Maybe String, agenda :: Q.Queue AgendaItem, attendees :: M.Map Int Attendee }
+type Input = { token :: Maybe String, agenda :: Agenda, attendees :: M.Map Int Attendee }
 
 component :: forall e. H.Component HH.HTML Query Input Void (Aff (LemmingPantsEffects e))
 component =
@@ -142,25 +156,118 @@ component =
           case m of
             CT.Flash s -> flash s next
         WSMsg s next ->
-          readJSON' s
-            <#> dispatcher
-
           H.liftAff (log s)
-          *> pure next
+          *> H.get >>= (\state ->
+          case runExcept (dispatcher state =<< readJSON' s) of
+            Left  es -> flash (foldMap renderForeignError es) next
+            Right s' -> H.put s' *> pure next
+          )
       where
         flash s next =
           H.modify (_ {flash = Just s})
           *> pure next
 
-        dispatcher :: forall fs. { event :: String | fs } -> _
-        dispatcher r =
+        dispatcher :: State -> WSMsg -> F State
+        dispatcher state r =
           case r.event of
-            "agenda_item_insert"   -> handleAgendaItem   r
-            "agenda_item_update"   -> handleAgendaItem   r
-            "attendee_insert"      -> handleAttendee     r
-            "attendee_update"      -> handleAttendee     r
-            "speaker_insert"       -> handleSpeaker      r
-            "speaker_update"       -> handleSpeaker      r
-            "speaker_queue_insert" -> handleSpeakerQueue r
-            "speaker_queue_update" -> handleSpeakerQueue r
+            "agenda_item_insert"   -> handleAgendaItem   (readImpl r.payload) Insert state
+            "agenda_item_update"   -> handleAgendaItem   (readImpl r.payload) Update state
+            "attendee_insert"      -> handleAttendee     r.payload            Insert state
+            "attendee_update"      -> handleAttendee     r.payload            Update state
+            "speaker_insert"       -> handleSpeaker      (readImpl r.payload) Insert state
+            "speaker_update"       -> handleSpeaker      (readImpl r.payload) Update state
+            "speaker_queue_insert" -> handleSpeakerQueue (readImpl r.payload) Insert state
+            "speaker_queue_update" -> handleSpeakerQueue (readImpl r.payload) Update state
+            _                      -> fail (ForeignError "Anything can happen.")
 
+        -- TODO: Make _ALL_ the go functions scream and shout if they can't update stuff.
+        handleAgendaItem
+          :: F { id      :: Int
+               , title   :: String
+               , content :: String
+               , order_  :: Int
+               , state   :: String
+               }
+             -> WSAction
+             -> State
+             -> F State
+        handleAgendaItem fr action st =
+          fr
+            >>= \air -> go action air st.agenda
+            <#> \r   -> st { agenda = AG.jumpToFirstActive r }
+          where
+            go Insert air ag = pure (AG.insert (newAI air) ag)
+            go Update air ag =
+              except (note (pure (ForeignError "ERROR: handleAgendaItem: Could not update AgendaItem!"))
+                ((AG.modify air.id (\(AgendaItem x) ->
+                  let (AgendaItem ai) = newAI air
+                   in Just $ AgendaItem (ai { speakerQueues = x.speakerQueues })) ag)))
+
+            newAI { id, title, content, order_, state } =
+              AgendaItem {id, title, content, order_, state, speakerQueues: mempty }
+
+        handleAttendee :: Foreign -> WSAction -> State -> F State
+        handleAttendee fr action state =
+            readImpl fr <#> \at -> state { attendees = go action at state.attendees }
+          where
+            go Insert a@(Attendee a') as = M.insert a'.id a as
+            go Update a@(Attendee a') as = M.update (const (Just a)) a'.id as
+
+        handleSpeaker
+          :: F { id               :: Int
+               , speaker_queue_id :: Int
+               , attendee_id      :: Int
+               , state            :: String
+               , times_spoken     :: Maybe Int
+               , agenda_item_id   :: Int
+               }
+             -> WSAction
+             -> State
+             -> F State
+        handleSpeaker fr action st =
+          fr >>= \r ->
+            except (note
+              (pure (ForeignError ("Modifying the speaker failed.")))
+              (AG.modify
+                r.agenda_item_id
+                (AG.modifySQ r.speaker_queue_id (go action r))
+                st.agenda)
+              <#> \a' -> st { agenda = a' })
+          where
+            go Insert r s@(SpeakerQueue s') =
+              Just (SpeakerQueue (s' { speakers = A.insert (newSpeaker r) s'.speakers }))
+            go Update r s@(SpeakerQueue s') =
+              case r.state of
+                "done" ->
+                  Just (SpeakerQueue (s' { speakers = A.filter (\(Speaker x) -> x.id /= r.id) s'.speakers }))
+                _      ->
+                  (A.findIndex (\(Speaker x) -> x.id == r.id) s'.speakers
+                    >>= (\i -> A.modifyAt i (const (newSpeaker r)) s'.speakers)
+                    <#> A.sort)
+                  <#> \ss' ->
+                    SpeakerQueue (s' { speakers = ss' })
+
+            newSpeaker {id, attendee_id, state, times_spoken} =
+              let ts = fromMaybe 0 times_spoken
+               in Speaker { id, attendeeId: attendee_id, state, timesSpoken: ts }
+
+        handleSpeakerQueue
+          :: F { id             :: Int
+               , agenda_item_id :: Int
+               , state          :: String
+               }
+          -> WSAction
+          -> State
+          -> F State
+        handleSpeakerQueue r action s =
+          r >>= \{id, agenda_item_id, state} ->
+          except (note
+            (pure (ForeignError "Modifying the speaker queue failed."))
+            (AG.modify agenda_item_id (go action {id, state}) s.agenda
+              <#> \a' -> s { agenda = a' }))
+          where
+            go Insert {id, state} ai = Just (AG.pushSQ (SpeakerQueue {id, state, speaking: Nothing, speakers: []}) ai)
+            go Update {id, state} ai =
+              if state == "done"
+                then AG.popSQIfMatchingId id ai
+                else Nothing

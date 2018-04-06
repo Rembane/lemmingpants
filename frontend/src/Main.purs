@@ -14,7 +14,6 @@ import Data.Array as A
 import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
-import Data.List as L
 import Data.Map as M
 import Data.Maybe (Maybe(Just, Nothing), isJust)
 import Data.Tuple (Tuple(..))
@@ -25,13 +24,14 @@ import Halogen.VDom.Driver (runUI)
 import Lemmingpants as LP
 import Network.HTTP.Affjax as AX
 import Postgrest as PG
-import Prelude (class Semigroup, Unit, bind, discard, map, pure, void, (*>), (<$>), (<*>), (<<<), (<>), (==))
-import Queue as Q
+import Prelude (class Semigroup, Unit, bind, discard, map, pure, void, (*>), (<$>), (<*>), (<<<), (<>))
 import Simple.JSON (read)
-import Types (AgendaItem(..), Attendee(..))
+import Types.Agenda (Agenda)
+import Types.Agenda as AG
+import Types.Attendee (Attendee(..))
 import Websockets (wsProducer)
 
-parseAgenda :: Foreign -> Either MultipleErrors (Array AgendaItem)
+parseAgenda :: Foreign -> Either MultipleErrors Agenda
 parseAgenda = read
 
 parseAttendees :: Foreign -> Either MultipleErrors (Array Attendee)
@@ -47,16 +47,14 @@ loadInitialState :: forall e. Aff (LemmingPantsEffects e) LP.Input
 loadInitialState = do
   token <- liftEff' (getItem localStorage LP.tokenKey)
   rs    <- sequential
-    (combineFailures <$> ((\r -> parseAgenda r.response)    <$> parallel (AX.get initialAgendaUrl))
+    (combineFailures <$> ((\r -> parseAgenda    r.response) <$> parallel (AX.get initialAgendaUrl))
                      <*> ((\r -> parseAttendees r.response) <$> parallel (AX.get initialAttendeesUrl)))
   case rs of
-    Left  es              -> traceA (foldMap renderForeignError es) *> liftEff' (throw "FETCH DATA ERROR!")
-    Right (Tuple ags ats) ->
-      let ({init, rest}) = L.span (\(AgendaItem a) -> a.state == "done") (L.fromFoldable ags)
-          agenda         = Q.new init rest
-          attendees      = M.fromFoldable (map (\(Attendee a) -> Tuple a.id (Attendee a)) ats)
+    Left  es             -> traceA (foldMap renderForeignError es) *> liftEff' (throw "FETCH DATA ERROR!")
+    Right (Tuple ag ats) ->
+      let attendees = M.fromFoldable (map (\(Attendee a) -> Tuple a.id (Attendee a)) ats)
+          agenda    = AG.jumpToFirstActive ag
        in pure { token, agenda, attendees }
-
   where
     initialAgendaUrl = "http://localhost:3000/agenda_item?select=*,speakerQueues:speaker_queue(id,state,speakers:active_speakers(id,attendeeId:attendee_id,state,timesSpoken:times_spoken))&speaker_queue.state=in.(init,active)&order=order_.asc&order=speaker_queue.id.asc&speaker_queue.active_speakers.state=in.(init,active)"
     initialAttendeesUrl = "http://localhost:3000/attendee?select=id,cid,name,nick"

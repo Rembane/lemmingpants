@@ -2,6 +2,7 @@ module Postgrest
   ( post
   , signedInAjax
   , useToken
+  , emptyResponse
   ) where
 
 -- | Here we keep the functions to make our interactions with Postgrest a breeze.
@@ -11,6 +12,7 @@ import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.MediaType (MediaType(..))
+import Data.Monoid (mempty)
 import Data.Traversable (traverse)
 import Network.HTTP.Affjax (AJAX)
 import Network.HTTP.Affjax as AX
@@ -66,3 +68,13 @@ signedInAjax url token m hs d =
        in AX.affjax (pg' { headers = pg'.headers <> [r] <> hs, method = Left m })
     )
     (useToken token)
+
+emptyResponse
+  :: forall d e
+   . WriteForeign d
+  => String
+  -> Maybe String
+  -> Method
+  -> d
+  -> Aff (ajax :: AJAX | e) (Either String (AX.AffjaxResponse String))
+emptyResponse url token m d = signedInAjax url token m mempty d

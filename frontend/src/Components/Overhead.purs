@@ -1,7 +1,5 @@
 module Components.Overhead where
 
-import Types
-
 import Data.Maybe (Maybe(..))
 import Halogen as H
 import Halogen.HTML as HH
