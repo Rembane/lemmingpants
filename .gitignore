@@ -5,3 +5,6 @@ bundle.js*
 */.psci_modules/*
 .stack-work/*
 */bower_components/*
+frontend/output/*
+frontend/main.js
+static/main.js
