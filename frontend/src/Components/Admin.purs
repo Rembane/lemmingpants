@@ -13,7 +13,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Network.HTTP.StatusCode (StatusCode(..))
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<<<), (<>), (>>=))
+import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<>), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
 import Types.Attendee (Attendee)
@@ -74,7 +74,7 @@ component =
             currentAI
         )
       where
-        currentAI = getCurrentAI state.agenda
+        currentAI = AG.getCurrentAI state.agenda
 
     eval :: Query ~> H.ParentDSL State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e))
     eval =
@@ -94,11 +94,7 @@ component =
     step f =
       H.get
         >>= \s ->
-            setCurrentAgendaItem ((note "ERROR: Agenda: Out of bounds step." (f s.agenda)) >>= getCurrentAI)
-
-    getCurrentAI :: Agenda -> Either String AgendaItem
-    getCurrentAI =
-      note "ERROR: There is no current agenda item." <<< AG.curr
+            setCurrentAgendaItem ((note "ERROR: Agenda: Out of bounds step." (f s.agenda)) >>= AG.getCurrentAI)
 
     setCurrentAgendaItem
       :: Either String AgendaItem

@@ -13,19 +13,20 @@ module Types.Agenda
   , insert
   , modify
   , jumpToFirstActive
+  , getCurrentAI
   ) where
 
 import Types.SpeakerQueue
 
 import Control.Alternative ((<|>))
 import Data.Array as A
+import Data.Either (Either, note)
 import Data.List as L
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Ordering (invert)
 import Data.Record as R
 import Data.Record.ShowRecord (showRecord)
-import Prelude (class Eq, class Ord, class Show, compare, eq, ($), (+), (-), (/=), (<), (<#>), (<<<), (<>), (==), (>=), (>>=), (>>>))
+import Prelude (class Eq, class Ord, class Show, compare, eq, (+), (-), (/=), (<), (<#>), (<<<), (<>), (==), (>=), (>>=), (>>>))
 import Simple.JSON (class ReadForeign, readImpl)
 import Type.Prelude (SProxy(..))
 
@@ -58,7 +59,7 @@ instance rfAI :: ReadForeign AgendaItem where
     readImpl fr
       <#> R.modify
             (SProxy :: SProxy "speakerQueues")
-            (L.sortBy (\a b -> invert $ compare a b) <<< (L.fromFoldable :: Array SpeakerQueue -> L.List SpeakerQueue))
+            (L.sort <<< (L.fromFoldable :: Array SpeakerQueue -> L.List SpeakerQueue))
       >>> AgendaItem
 
 -- The top of the speaker queue stack
@@ -141,4 +142,8 @@ jumpToFirstActive (Agenda _ as) = Agenda i as
     i = fromMaybe ((A.length as) - 1)
       (A.findIndex (\(AgendaItem a) -> a.state == "active") as
       <|> A.findIndex (\(AgendaItem a) -> a.state /= "done") as)
+
+getCurrentAI :: Agenda -> Either String AgendaItem
+getCurrentAI =
+  note "ERROR: There is no current agenda item." <<< curr
 

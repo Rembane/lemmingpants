@@ -8,7 +8,7 @@ import Data.Either (Either(Right, Left))
 import Data.Foreign (MultipleErrors)
 import Data.HTTP.Method (Method(..))
 import Data.Map as M
-import Data.Maybe (Maybe(..), fromJust, fromMaybe, maybe)
+import Data.Maybe (Maybe(Just, Nothing), fromJust, maybe)
 import Data.StrMap as SM
 import Debug.Trace (traceAnyA)
 import Effects (LemmingPantsEffects)
@@ -19,10 +19,10 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, map, pure, show, unit, ($), (*>), (<>), (==))
+import Prelude (type (~>), Unit, bind, id, map, pure, show, unit, ($), (*>), (<>))
 import Simple.JSON (readJSON)
-import Types.Attendee (Attendee(..))
-import Types.Speaker (Speaker(..))
+import Types.Attendee (Attendee)
+import Types.Speaker (Speaker(..), visualizeSpeaker)
 import Types.SpeakerQueue (SpeakerQueue(..))
 
 type State =
@@ -46,7 +46,7 @@ data Message
 component :: forall e. H.Component HH.HTML Query State Message (Aff (LemmingPantsEffects e))
 component =
   H.parentComponent
-    { initialState: moveActive
+    { initialState: id
     , render
     , eval
     , receiver: HE.input GotNewState
@@ -63,11 +63,11 @@ component =
         , HH.div_
             [ HH.p_
               [ HH.strong_ [HH.text "Speaking: "]
-              , HH.text (maybe "–" (visualizeSpeaker state) sq.speaking)
+              , HH.text (maybe "–" (visualizeSpeaker state.attendees) sq.speaking)
               ]
             , HH.ol_
                 (map
-                  (\s -> HH.li_ [HH.text (visualizeSpeaker state s) ])
+                  (\s -> HH.li_ [HH.text (visualizeSpeaker state.attendees s) ])
                   sq.speakers)
             , HH.slot
               unit
@@ -84,12 +84,6 @@ component =
         ]
       where
         (SpeakerQueue sq) = state.speakerQueue
-
-    visualizeSpeaker :: State -> Speaker -> String
-    visualizeSpeaker state (Speaker s) =
-      case M.lookup s.attendeeId state.attendees of
-        Nothing           -> "ERROR: Not found!"
-        Just (Attendee a) -> fromMaybe a.name a.nick
 
     eval :: Query ~> H.ParentDSL State Query F.Query Unit Message (Aff (LemmingPantsEffects e))
     eval =
@@ -192,23 +186,8 @@ component =
                     _ ->
                       H.raise (Flash "SpeakerQueue.Eject -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
           *> pure next
-        GotNewState s next -> H.put (moveActive s) *> pure next
+        GotNewState s next -> H.put s *> pure next
 
     activeSpeakersUrl :: String
     activeSpeakersUrl = "http://localhost:3000/active_speakers?select=id,attendeeId:attendee_id,state,timesSpoken:times_spoken"
 
-    -- | If there is an active speaker, move it from the queue to the speaking slot.
-    moveActive :: State -> State
-    moveActive state =
-      case sq.speaking of
-        Just _  -> state
-        Nothing ->
-          case A.uncons sq.speakers of
-            Nothing             -> state
-            Just ({head, tail}) ->
-              let (Speaker s) = head
-               in if s.state == "active"
-                    then state { speakerQueue = SpeakerQueue (sq { speaking = Just (Speaker s), speakers = tail }) }
-                    else state
-      where
-        (SpeakerQueue sq) = state.speakerQueue
