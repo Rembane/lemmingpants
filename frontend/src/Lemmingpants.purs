@@ -33,7 +33,6 @@ import Types.Agenda as AG
 import Types.Attendee (Attendee(..))
 import Types.Speaker (Speaker(..))
 import Types.SpeakerQueue (SpeakerQueue(..), addSpeaker, modifySpeaker)
-import Types.Websocket (WSMsg)
 
 type ChildQuery = Coproduct5 CT.Query CO.Query CA.Query CL.Query CH.Query
 type ChildSlot  = Either5 Int Int Int Int Int
@@ -165,7 +164,10 @@ component =
           H.modify (_ {flash = Just s})
           *> pure next
 
-        dispatcher :: State -> WSMsg -> F State
+        dispatcher
+          :: State
+          -> { channel :: String, event :: String, payload :: Foreign }
+          -> F State
         dispatcher state r =
           case r.event of
             "agenda_item_insert"   -> handleAgendaItem   (readImpl r.payload) Insert state
