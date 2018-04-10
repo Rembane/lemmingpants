@@ -1,12 +1,12 @@
 module Types.Speaker where
 
 import Data.Map as M
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (maybe)
 import Data.Newtype (class Newtype)
 import Data.Record.ShowRecord (showRecord)
 import Prelude (class Eq, class Ord, class Show, compare, (<>))
 import Simple.JSON (class ReadForeign)
-import Types.Attendee (Attendee(..))
+import Types.Attendee (Attendee, visualizeAttendee)
 
 newtype Speaker = Speaker
   { id          :: Int
@@ -27,6 +27,4 @@ instance ordSp :: Ord Speaker where
 
 visualizeSpeaker :: M.Map Int Attendee -> Speaker -> String
 visualizeSpeaker m (Speaker s) =
-  case M.lookup s.attendeeId m of
-    Nothing           -> "ERROR: Speaker not found!"
-    Just (Attendee a) -> fromMaybe a.name a.nick
+  maybe "ERROR: Speaker not found!" visualizeAttendee (M.lookup s.attendeeId m)

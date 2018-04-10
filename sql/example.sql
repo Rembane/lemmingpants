@@ -14,7 +14,7 @@ SELECT 'hen', crypt('grawr', gen_salt('bf', 8)), id FROM role WHERE name='admin_
 
 SET SCHEMA 'api';
 
-INSERT INTO attendee(id, cid, name) VALUES(1, 'ekeroot', 'A. Ekeroot');
+INSERT INTO attendee(id, cid, name, nick) VALUES(1, 'ekeroot', 'Andreas Ekeroot', 'Equeroot');
 INSERT INTO attendee(id, cid, name) VALUES(2, 'snelob', 'Snel Bob');
 INSERT INTO attendee(id, cid, name) VALUES(3, 'bobbobson', 'Bob Bobsson');
 INSERT INTO attendee(id, cid, name) VALUES(4, 'testson', 'Test Testson');
