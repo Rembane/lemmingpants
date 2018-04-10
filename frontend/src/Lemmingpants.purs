@@ -5,7 +5,7 @@ import Components.Admin as CA
 import Components.Home as CH
 import Components.Login as CL
 import Components.Overhead as CO
-import Components.Terminal as CT
+import Components.Registration as CR
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
@@ -34,7 +34,7 @@ import Types.Attendee (Attendee(..))
 import Types.Speaker (Speaker(..))
 import Types.SpeakerQueue (SpeakerQueue(..), addSpeaker, modifySpeaker)
 
-type ChildQuery = Coproduct5 CT.Query CO.Query CA.Query CL.Query CH.Query
+type ChildQuery = Coproduct5 CR.Query CO.Query CA.Query CL.Query CH.Query
 type ChildSlot  = Either5 Int Int Int Int Int
 
 data WSAction
@@ -43,18 +43,18 @@ data WSAction
 
 data Location
   = Home
-  | Terminal
+  | Registration
   | Overhead
   | Admin
   | Login
 
 locations :: Match Location
 locations
-  =   (Terminal <$ lit "terminal")
-  <|> (Overhead <$ lit "overhead")
-  <|> (Admin    <$ lit "admin")
-  <|> (Login    <$ lit "login")
-  <|> (Home     <$ lit "")
+  =   (Registration <$ lit "registration")
+  <|> (Overhead     <$ lit "overhead")
+  <|> (Admin        <$ lit "admin")
+  <|> (Login        <$ lit "login")
+  <|> (Home         <$ lit "")
 
 type State =
   { currentLocation :: Location
@@ -65,11 +65,11 @@ type State =
   }
 
 data Query a
-  = ChangePage  Location   a
-  | AdminMsg    CA.Message a
-  | LoginMsg    CL.Message a
-  | TerminalMsg CT.Message a
-  | WSMsg       String     a
+  = ChangePage      Location   a
+  | AdminMsg        CA.Message a
+  | LoginMsg        CL.Message a
+  | RegistrationMsg CR.Message a
+  | WSMsg           String     a
 
 tokenKey :: String
 tokenKey = "token"
@@ -102,7 +102,7 @@ component =
             Just  s -> [ HH.div_ [ HH.text s ] ]
         ) <>
         [ HH.ul_
-          [ HH.li_ [HH.a [HP.href "#terminal"] [HH.text "Terminal"]]
+          [ HH.li_ [HH.a [HP.href "#registration"] [HH.text "Registration"]]
           , HH.li_ [HH.a [HP.href "#overhead"] [HH.text "Overhead"]]
           , HH.li_ [HH.a [HP.href "#admin"]    [HH.text "Admin"]]
           , HH.li_ [HH.a [HP.href "#login"]    [HH.text "Login"]]
@@ -117,11 +117,11 @@ component =
           -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
         locationToSlot l s =
           case l of
-            Terminal -> go CP.cp1 1 CT.component s.token (HE.input TerminalMsg)
-            Overhead -> go CP.cp2 2 CO.component ohs     (const Nothing)
-            Admin    -> go CP.cp3 3 CA.component s'      (HE.input AdminMsg)
-            Login    -> go CP.cp4 4 CL.component unit    (HE.input LoginMsg)
-            Home     -> go CP.cp5 5 CH.component unit    (const Nothing)
+            Registration -> go CP.cp1 1 CR.component s.token (HE.input RegistrationMsg)
+            Overhead     -> go CP.cp2 2 CO.component ohs     (const Nothing)
+            Admin        -> go CP.cp3 3 CA.component s'      (HE.input AdminMsg)
+            Login        -> go CP.cp4 4 CL.component unit    (HE.input LoginMsg)
+            Home         -> go CP.cp5 5 CH.component unit    (const Nothing)
           where
             go :: forall g i o
              . CP.ChildPath g ChildQuery Int ChildSlot
@@ -149,9 +149,9 @@ component =
               *> H.liftEff (setItem localStorage tokenKey t)
               *> pure next
             CL.Flash s -> flash s next
-        TerminalMsg m next ->
+        RegistrationMsg m next ->
           case m of
-            CT.Flash s -> flash s next
+            CR.Flash s -> flash s next
         WSMsg s next ->
           H.liftAff (log s)
           *> H.get >>= (\state ->
