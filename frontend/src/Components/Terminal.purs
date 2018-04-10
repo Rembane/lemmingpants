@@ -61,7 +61,7 @@ component =
     eval :: Query ~> H.HalogenM State Query F.Query Unit Message (Aff (LemmingPantsEffects e))
     eval =
       case _ of
-        FormMsg m next      -> do
+        FormMsg m next -> do
             case m of
               F.FormSubmitted m' -> do
                 token <- H.gets (\s -> s.token)
@@ -76,7 +76,6 @@ component =
                       _ ->
                         traceAnyA r *> traceA r.response
                 pure next
-        -- Have we got a new token?
         HandleInput mt next ->
           H.modify (\s -> s { token = mt })
           *> pure next
