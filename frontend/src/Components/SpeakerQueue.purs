@@ -19,7 +19,7 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, id, map, pure, show, unit, ($), (*>), (<>))
+import Prelude (type (~>), Unit, bind, id, map, pure, show, unit, ($), (*>), (<=), (<>))
 import Simple.JSON (readJSON)
 import Types.Attendee (Attendee)
 import Types.Speaker (Speaker(..), visualizeSpeaker)
@@ -30,6 +30,7 @@ type State =
   , speakerQueue :: SpeakerQueue
   , token        :: Maybe String
   , attendees    :: M.Map Int Attendee
+  , sqHeight     :: Int
   }
 
 data Query a
@@ -58,7 +59,13 @@ component =
       HH.div_
         [ HH.div_
           [ HH.button [ HE.onClick (HE.input_ PushSQ) ] [ HH.text "Push speakerqueue" ]
-          , HH.button [ HE.onClick (HE.input_ PopSQ)  ] [ HH.text "Pop speakerqueue" ]
+          , HH.button
+            [ HE.onClick (HE.input_ PopSQ)
+            , if state.sqHeight <= 1
+                then HP.disabled true
+                else HP.disabled false
+            ]
+            [ HH.text "Pop speakerqueue" ]
           ]
         , HH.div_
             [ HH.p_

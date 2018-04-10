@@ -88,10 +88,42 @@ CREATE FUNCTION create_speaker_queue() RETURNS TRIGGER
     END
     $$;
 
-CREATE TRIGGER at_least_one_speakerqueue
+CREATE TRIGGER create_speakerqueue_when_agenda_item_is_created
     AFTER INSERT ON agenda_item
     FOR EACH ROW
     EXECUTE PROCEDURE create_speaker_queue();
+
+CREATE FUNCTION at_least_one_speaker_queue() RETURNS TRIGGER
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+        active_speaker_queues INTEGER;
+    BEGIN
+        IF NEW.state = 'done'
+            THEN
+                SELECT COUNT(*)
+                INTO active_speaker_queues
+                FROM speaker_queue
+                WHERE agenda_item_id = NEW.agenda_item_id
+                AND (state = 'init' OR state = 'active');
+
+                IF active_speaker_queues < 2
+                    THEN
+                        RAISE EXCEPTION 'Not enough speaker queues left. I cannot let you do that Dave.';
+                        RETURN OLD;
+                    ELSE
+                        RETURN NEW;
+                    END IF;
+            ELSE
+                RETURN NEW;
+            END IF;
+    END
+    $$;
+
+CREATE TRIGGER at_least_one_speaker_queue
+    BEFORE UPDATE ON speaker_queue
+    FOR EACH ROW
+    EXECUTE PROCEDURE at_least_one_speaker_queue();
 
 -- TODO: Make this work for the speaker table too.
 -- It doesn't make any sense to add a speaker to a speakerqueue that isn't on the top of the stack.

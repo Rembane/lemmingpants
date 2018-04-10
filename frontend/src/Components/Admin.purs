@@ -61,14 +61,15 @@ component =
         ] <> either
             (const [HH.text "No agenda item => no speaker queue."])
             (\ai@(AgendaItem ai') ->
-              [ HH.p_ [ HH.text ("Speaker queue stack height: " <> show (L.length ai'.speakerQueues)) ]
+              let sqHeight = L.length ai'.speakerQueues in
+              [ HH.p_ [ HH.text ("Speaker queue stack height: " <> show sqHeight) ]
               , case AG.topSQ ai of
                   Nothing -> HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
                   Just sq ->
                     HH.slot
                       unit
                       SQ.component
-                      { speakerQueue: sq, token: state.token, attendees: state.attendees, agendaItemId: ai'.id }
+                      { speakerQueue: sq, token: state.token, attendees: state.attendees, agendaItemId: ai'.id, sqHeight }
                       (HE.input SQMsg)
               ])
             currentAI
