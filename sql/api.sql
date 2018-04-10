@@ -143,7 +143,7 @@ CREATE FUNCTION check_if_top_speakerqueue() RETURNS TRIGGER
 
         IF has_greater_friends
             THEN
-                RAISE WARNING 'This speaker queue is not on top of the stack!';
+                RAISE EXCEPTION 'This speaker queue is not on top of the stack!';
                 RETURN OLD;
             ELSE
                 RETURN NEW;
@@ -170,7 +170,7 @@ CREATE FUNCTION may_only_add_or_update_speaker_to_init_or_active_speaker_queue()
       THEN
         RETURN NEW;
       ELSE
-        RAISE WARNING 'You are trying to insert or update speakers on a done speaker queue. It is too late for that now.';
+        RAISE EXCEPTION 'You are trying to insert or update speakers on a done speaker queue. It is too late for that now.';
         RETURN OLD;
     END IF;
   END
