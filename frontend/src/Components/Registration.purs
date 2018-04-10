@@ -65,18 +65,18 @@ component =
         FormMsg m next -> do
             case m of
               F.FormSubmitted m' -> do
-                token <- H.gets (\s -> s.token)
                 -- If the nick field is empty, remove it so we don't get empty nicks in the database.
                 let m'' = case null <$> lookup "nick" m' of
                             Just true -> delete "nick" m'
                             _         -> m'
-                er    <- H.liftAff (PG.signedInAjax "http://localhost:3000/attendee" token POST mempty m'')
+                token <- H.gets (\s -> s.token)
+                er    <- H.liftAff (PG.signedInAjax "http://localhost:3000/rpc/create_attendee" token POST mempty m'')
                 case er of
                   Left es -> H.raise (Flash es)
                   Right r ->
                     case r.status of
                       -- The Location-header contains the new Attendee URL.
-                      StatusCode 201 -> do -- The `Created` HTTP status code.
+                      StatusCode 200 -> do -- The `Created` HTTP status code.
                         H.raise (Flash ("Thank you for registering, " <> fromMaybe "ERROR! EXTERMINATE!" (lookup "name" m')))
                       _ ->
                         traceAnyA r *> traceA r.response

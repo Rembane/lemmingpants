@@ -14,11 +14,11 @@ SELECT 'hen', crypt('grawr', gen_salt('bf', 8)), id FROM role WHERE name='admin_
 
 SET SCHEMA 'api';
 
-INSERT INTO attendee(id, cid, name, nick) VALUES(1, 'ekeroot', 'Andreas Ekeroot', 'Equeroot');
-INSERT INTO attendee(id, cid, name) VALUES(2, 'snelob', 'Snel Bob');
-INSERT INTO attendee(id, cid, name) VALUES(3, 'bobbobson', 'Bob Bobsson');
-INSERT INTO attendee(id, cid, name) VALUES(4, 'testson', 'Test Testson');
-INSERT INTO attendee(id, cid, name) VALUES(5, 'doedsbengt', 'Döds Bengt');
+SELECT create_attendee(1, 'ekeroot', 'Andreas Ekeroot', 'Equeroot');
+SELECT create_attendee(2, 'snelob', 'Snel Bob');
+SELECT create_attendee(3, 'bobbobson', 'Bob Bobsson');
+SELECT create_attendee(4, 'testson', 'Test Testson');
+SELECT create_attendee(5, 'doedsbengt', 'Döds Bengt');
 
 INSERT INTO agenda_item(title, content, order_)
     VALUES('Mötets öppnande', 'Mötet bör öpnas med trumpetstötar och godis.', 1);

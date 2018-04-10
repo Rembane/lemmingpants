@@ -1,7 +1,6 @@
 module Components.Overhead where
 
 import Data.Either (Either(Right, Left))
-import Data.Map as M
 import Data.Maybe (maybe, maybe')
 import Halogen as H
 import Halogen.HTML as HH
@@ -9,13 +8,13 @@ import Halogen.HTML.Events as HE
 import Prelude (type (~>), Void, id, map, pure, (*>))
 import Types.Agenda (Agenda, AgendaItem(AgendaItem))
 import Types.Agenda as AG
-import Types.Attendee (Attendee)
+import Types.Attendee (AttendeeDB)
 import Types.Speaker (visualizeSpeaker)
 import Types.SpeakerQueue (SpeakerQueue(..))
 
 type State =
   { agenda    :: Agenda
-  , attendees :: M.Map Int Attendee
+  , attendees :: AttendeeDB
   }
 type Input = State
 

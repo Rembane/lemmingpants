@@ -5,7 +5,6 @@ import Control.Monad.Aff (Aff)
 import Data.Either (Either(..), either, note)
 import Data.HTTP.Method (Method(..))
 import Data.List as L
-import Data.Map as M
 import Data.Maybe (Maybe(Nothing, Just))
 import Effects (LemmingPantsEffects)
 import Halogen as H
@@ -16,12 +15,12 @@ import Postgrest as PG
 import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<>), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
-import Types.Attendee (Attendee)
+import Types.Attendee (AttendeeDB)
 
 type State =
   { agenda    :: Agenda
   , token     :: Maybe String
-  , attendees :: M.Map Int Attendee
+  , attendees :: AttendeeDB
   }
 type Input = State
 

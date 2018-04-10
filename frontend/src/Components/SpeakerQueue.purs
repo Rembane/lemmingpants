@@ -7,7 +7,6 @@ import Data.Array as A
 import Data.Either (Either(Right, Left))
 import Data.Foreign (MultipleErrors)
 import Data.HTTP.Method (Method(..))
-import Data.Map as M
 import Data.Maybe (Maybe(Just, Nothing), fromJust, maybe)
 import Data.StrMap as SM
 import Debug.Trace (traceAnyA)
@@ -21,7 +20,7 @@ import Partial.Unsafe (unsafePartial)
 import Postgrest as PG
 import Prelude (type (~>), Unit, bind, id, map, pure, show, unit, ($), (*>), (<=), (<>))
 import Simple.JSON (readJSON)
-import Types.Attendee (Attendee)
+import Types.Attendee (Attendee(..), AttendeeDB, getAttendeeByNumber)
 import Types.Speaker (Speaker(..), visualizeSpeaker)
 import Types.SpeakerQueue (SpeakerQueue(..))
 
@@ -29,7 +28,7 @@ type State =
   { agendaItemId :: Int
   , speakerQueue :: SpeakerQueue
   , token        :: Maybe String
-  , attendees    :: M.Map Int Attendee
+  , attendees    :: AttendeeDB
   , sqHeight     :: Int
   }
 
@@ -136,22 +135,26 @@ component =
             F.FormSubmitted m' ->
               case readJSON (unsafePartial (fromJust (SM.lookup "id" m'))) :: Either MultipleErrors Int of
                 Left es -> traceAnyA es
-                Right i -> do
-                  er <- H.liftAff $ PG.emptyResponse
-                    "http://localhost:3000/speaker"
-                    state.token
-                    POST
-                    { speaker_queue_id: sq.id
-                    , attendee_id:      i
-                    }
-                  case er of
-                    Left  es -> traceAnyA es
-                    Right r ->
-                      case r.status of
-                        StatusCode 201 -> -- The `Created` HTTP status code.
-                          pure unit
-                        _ ->
-                          H.raise (Flash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+                Right n -> do
+                  case getAttendeeByNumber n state.attendees of
+                    Nothing           ->
+                      H.raise (Flash ("Couldn't find attendee with number: " <> show n))
+                    Just (Attendee a) -> do
+                      er <- H.liftAff $ PG.emptyResponse
+                        "http://localhost:3000/speaker"
+                        state.token
+                        POST
+                        { speaker_queue_id: sq.id
+                        , attendee_id:      a.id
+                        }
+                      case er of
+                        Left  es -> traceAnyA es
+                        Right r ->
+                          case r.status of
+                            StatusCode 201 -> -- The `Created` HTTP status code.
+                              pure unit
+                            _ ->
+                              H.raise (Flash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
           *> pure next
         Next next -> do
           state <- H.get

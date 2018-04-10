@@ -15,7 +15,6 @@ import Data.Either.Nested (Either5)
 import Data.Foldable (foldMap)
 import Data.Foreign (F, Foreign, ForeignError(..), fail, renderForeignError)
 import Data.Functor.Coproduct.Nested (Coproduct5)
-import Data.Map as M
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe)
 import Data.Monoid (mempty)
 import Effects (LemmingPantsEffects)
@@ -30,7 +29,7 @@ import Routing.Match.Class (lit)
 import Simple.JSON (readImpl, readJSON')
 import Types.Agenda (Agenda, AgendaItem(AgendaItem))
 import Types.Agenda as AG
-import Types.Attendee (Attendee(..))
+import Types.Attendee (Attendee, AttendeeDB, insertAttendee)
 import Types.Speaker (Speaker(..))
 import Types.SpeakerQueue (SpeakerQueue(..), addSpeaker, modifySpeaker)
 
@@ -61,7 +60,7 @@ type State =
   , token           :: Maybe String
   , flash           :: Maybe String
   , agenda          :: Agenda
-  , attendees       :: M.Map Int Attendee
+  , attendees       :: AttendeeDB
   }
 
 data Query a
@@ -74,7 +73,7 @@ data Query a
 tokenKey :: String
 tokenKey = "token"
 
-type Input = { token :: Maybe String, agenda :: Agenda, attendees :: M.Map Int Attendee }
+type Input = { token :: Maybe String, agenda :: Agenda, attendees :: AttendeeDB }
 
 component :: forall e. H.Component HH.HTML Query Input Void (Aff (LemmingPantsEffects e))
 component =
@@ -172,8 +171,8 @@ component =
           case r.event of
             "agenda_item_insert"   -> handleAgendaItem   (readImpl r.payload) Insert state
             "agenda_item_update"   -> handleAgendaItem   (readImpl r.payload) Update state
-            "attendee_insert"      -> handleAttendee     r.payload            Insert state
-            "attendee_update"      -> handleAttendee     r.payload            Update state
+            "attendee_insert"      -> handleAttendee     (readImpl r.payload)        state
+            "attendee_update"      -> handleAttendee     (readImpl r.payload)        state
             "speaker_insert"       -> handleSpeaker      (readImpl r.payload) Insert state
             "speaker_update"       -> handleSpeaker      (readImpl r.payload) Update state
             "speaker_queue_insert" -> handleSpeakerQueue (readImpl r.payload) Insert state
@@ -206,12 +205,9 @@ component =
             newAI { id, title, content, order_, state } =
               AgendaItem {id, title, content, order_, state, speakerQueues: mempty }
 
-        handleAttendee :: Foreign -> WSAction -> State -> F State
-        handleAttendee fr action state =
-            readImpl fr <#> \at -> state { attendees = go action at state.attendees }
-          where
-            go Insert a@(Attendee a') as = M.insert a'.id a as
-            go Update a@(Attendee a') as = M.update (const (Just a)) a'.id as
+        handleAttendee :: F Attendee -> State -> F State
+        handleAttendee fr state =
+            fr <#> \at -> state { attendees = insertAttendee at state.attendees }
 
         handleSpeaker
           :: F { id               :: Int

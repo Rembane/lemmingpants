@@ -14,7 +14,6 @@ import Data.Array as A
 import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
-import Data.Map as M
 import Data.Maybe (Maybe(Just, Nothing), isJust)
 import Data.Tuple (Tuple(..))
 import Debug.Trace (traceA)
@@ -28,7 +27,7 @@ import Prelude (class Semigroup, Unit, bind, discard, map, pure, void, (*>), (<$
 import Simple.JSON (read)
 import Types.Agenda (Agenda)
 import Types.Agenda as AG
-import Types.Attendee (Attendee(..))
+import Types.Attendee (Attendee, newAttendeeDB)
 import Websockets (wsProducer)
 
 parseAgenda :: Foreign -> Either MultipleErrors Agenda
@@ -52,12 +51,12 @@ loadInitialState = do
   case rs of
     Left  es             -> traceA (foldMap renderForeignError es) *> liftEff' (throw "FETCH DATA ERROR!")
     Right (Tuple ag ats) ->
-      let attendees = M.fromFoldable (map (\(Attendee a) -> Tuple a.id (Attendee a)) ats)
+      let attendees = newAttendeeDB ats
           agenda    = AG.jumpToFirstActive ag
        in pure { token, agenda, attendees }
   where
     initialAgendaUrl = "http://localhost:3000/agenda_item?select=*,speakerQueues:speaker_queue(id,state,speakers:active_speakers(id,attendeeId:attendee_id,state,timesSpoken:times_spoken))&speaker_queue.state=in.(init,active)&order=order_.asc&order=speaker_queue.id.asc&speaker_queue.active_speakers.state=in.(init,active)"
-    initialAttendeesUrl = "http://localhost:3000/attendee?select=id,cid,name,nick"
+    initialAttendeesUrl = "http://localhost:3000/attendee?select=id,cid,name,nick,numbers:attendee_number(id)"
 
 main :: forall e. Eff (LemmingPantsEffects (console :: CONSOLE | e)) Unit
 main = do
