@@ -14,7 +14,16 @@ CREATE EXTENSION pgcrypto WITH SCHEMA model;
 DROP EXTENSION IF EXISTS pgjwt CASCADE;
 CREATE EXTENSION pgjwt;
 
+CREATE TYPE api.state AS ENUM ('init', 'active', 'done');
+
 \i sql/role.sql
 \i sql/model.sql
-\i sql/api.sql
+-- Public tables, views and functions
+\i sql/api/websocket.sql
+\i sql/api/attendee.sql
+\i sql/api/agenda_item.sql
+\i sql/api/speaker_queue.sql
+\i sql/api/speaker.sql
+\i sql/api/auth.sql
+-- Example data
 \i sql/example.sql
