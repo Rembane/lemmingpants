@@ -53,5 +53,5 @@ CREATE FUNCTION create_attendee(id INTEGER, cid TEXT, name TEXT, nick TEXT DEFAU
     INSERT INTO attendee_number(id, attendee_id) VALUES (create_attendee.id, aid);
   END
   $$;
-REVOKE ALL ON FUNCTION create_attendee FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION create_attendee TO web_anon, insert_attendee_user, admin_user;
+REVOKE ALL ON FUNCTION create_attendee(INTEGER, TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION create_attendee(INTEGER, TEXT, TEXT, TEXT) TO web_anon, insert_attendee_user, admin_user;
