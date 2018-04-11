@@ -1,5 +1,7 @@
 module Postgrest
-  ( post
+  ( createURL
+  , createWSURL
+  , post
   , signedInAjax
   , useToken
   , emptyResponse
@@ -20,6 +22,15 @@ import Network.HTTP.Affjax.Response (class Respondable)
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Prelude ((<>))
 import Simple.JSON (class WriteForeign, writeJSON)
+
+foreign import urlPrefix   :: String
+foreign import wsUrlPrefix :: String
+
+createURL :: String -> String
+createURL = (urlPrefix <> _)
+
+createWSURL :: String -> String
+createWSURL = (wsUrlPrefix <> _)
 
 pgrequest
   :: forall d

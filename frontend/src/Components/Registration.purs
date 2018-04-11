@@ -16,6 +16,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
+import Postgrest (createURL)
 import Postgrest as PG
 import Prelude (type (~>), Unit, bind, discard, pure, unit, (*>), (<$>), (<>))
 
@@ -70,7 +71,7 @@ component =
                             Just true -> delete "nick" m'
                             _         -> m'
                 token <- H.gets (\s -> s.token)
-                er    <- H.liftAff (PG.signedInAjax "http://localhost:3000/rpc/create_attendee" token POST mempty m'')
+                er    <- H.liftAff (PG.signedInAjax (createURL "/rpc/create_attendee") token POST mempty m'')
                 case er of
                   Left es -> H.raise (Flash es)
                   Right r ->

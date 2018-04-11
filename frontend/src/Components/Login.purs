@@ -1,5 +1,7 @@
 module Components.Login where
 
+import Components.Forms as F
+import Components.Forms.Field (mkField)
 import Control.Monad.Aff (Aff)
 import Data.Array as A
 import Data.Either (Either(..))
@@ -7,15 +9,14 @@ import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
 import Data.Maybe (Maybe(..), fromJust)
 import Effects (LemmingPantsEffects)
-import Components.Forms as F
-import Components.Forms.Field (mkField)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafePartial)
+import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, discard, pure, unit, (*>))
+import Prelude (type (~>), Unit, bind, const, discard, pure, unit, ($), (*>))
 import Simple.JSON (read)
 
 type State = Unit
@@ -58,7 +59,7 @@ component =
         FormMsg m next ->
           case m of
             F.FormSubmitted m' -> do
-              r <- H.liftAff (PG.post "http://localhost:3000/rpc/login" m')
+              r <- H.liftAff $ PG.post (createURL "/rpc/login") m'
               case parseToken r.response of
                 Left  es -> H.raise (Flash (foldMap renderForeignError es))
                 Right ts -> let t = unsafePartial (fromJust (A.head ts))

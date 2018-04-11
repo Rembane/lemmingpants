@@ -17,6 +17,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
+import Postgrest (createURL)
 import Postgrest as PG
 import Prelude (type (~>), Unit, bind, id, map, pure, show, unit, ($), (*>), (<=), (<>))
 import Simple.JSON (readJSON)
@@ -97,7 +98,7 @@ component =
         PushSQ next -> do
           state <- H.get
           er <- H.liftAff $ PG.emptyResponse
-             "http://localhost:3000/speaker_queue"
+             (createURL "/speaker_queue")
             state.token
             POST
             { agenda_item_id: state.agendaItemId
@@ -115,7 +116,7 @@ component =
           state <- H.get
           let (SpeakerQueue sq) = state.speakerQueue
           er <- H.liftAff $ PG.emptyResponse
-             ("http://localhost:3000/speaker_queue?id=eq." <> show sq.id)
+             (createURL $ "/speaker_queue?id=eq." <> show sq.id)
              state.token
              PATCH
              { state: "done" }
@@ -141,7 +142,7 @@ component =
                       H.raise (Flash ("Couldn't find attendee with number: " <> show n))
                     Just (Attendee a) -> do
                       er <- H.liftAff $ PG.emptyResponse
-                        "http://localhost:3000/speaker"
+                        (createURL "/speaker")
                         state.token
                         POST
                         { speaker_queue_id: sq.id
@@ -163,7 +164,7 @@ component =
             Nothing          -> pure unit
             Just (Speaker s) -> do
               er <- H.liftAff $ PG.emptyResponse
-                      "http://localhost:3000/rpc/set_current_speaker"
+                      (createURL "/rpc/set_current_speaker")
                       state.token
                       POST
                       {id: s.id}
@@ -183,7 +184,7 @@ component =
             Nothing          -> pure unit
             Just (Speaker s) -> do
               er <- H.liftAff $ PG.emptyResponse
-                      ("http://localhost:3000/speaker?id=eq." <> show s.id)
+                      (createURL $ "/speaker?id=eq." <> show s.id)
                       state.token
                       PATCH
                       { state: "done" }
@@ -199,5 +200,5 @@ component =
         GotNewState s next -> H.put s *> pure next
 
     activeSpeakersUrl :: String
-    activeSpeakersUrl = "http://localhost:3000/active_speakers?select=id,attendeeId:attendee_id,state,timesSpoken:times_spoken"
+    activeSpeakersUrl = createURL "/active_speakers?select=id,attendeeId:attendee_id,state,timesSpoken:times_spoken"
 

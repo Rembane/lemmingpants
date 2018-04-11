@@ -22,8 +22,9 @@ import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
 import Lemmingpants as LP
 import Network.HTTP.Affjax as AX
+import Postgrest (createURL, createWSURL)
 import Postgrest as PG
-import Prelude (class Semigroup, Unit, bind, discard, map, pure, void, (*>), (<$>), (<*>), (<<<), (<>))
+import Prelude (class Semigroup, Unit, bind, discard, map, pure, void, ($), (*>), (<$>), (<*>), (<<<), (<>))
 import Simple.JSON (read)
 import Types.Agenda (Agenda)
 import Types.Agenda as AG
@@ -55,8 +56,8 @@ loadInitialState = do
           agenda    = AG.jumpToFirstActive ag
        in pure { token, agenda, attendees }
   where
-    initialAgendaUrl = "http://localhost:3000/agenda_item?select=*,speakerQueues:speaker_queue(id,state,speakers:active_speakers(id,attendeeId:attendee_id,state,timesSpoken:times_spoken))&speaker_queue.state=in.(init,active)&order=order_.asc&order=speaker_queue.id.asc&speaker_queue.active_speakers.state=in.(init,active)"
-    initialAttendeesUrl = "http://localhost:3000/attendee?select=id,cid,name,nick,numbers:attendee_number(id)"
+    initialAgendaUrl = createURL "/agenda_item?select=*,speakerQueues:speaker_queue(id,state,speakers:active_speakers(id,attendeeId:attendee_id,state,timesSpoken:times_spoken))&speaker_queue.state=in.(init,active)&order=order_.asc&order=speaker_queue.id.asc&speaker_queue.active_speakers.state=in.(init,active)"
+    initialAttendeesUrl = createURL "/attendee?select=id,cid,name,nick,numbers:attendee_number(id)"
 
 main :: forall e. Eff (LemmingPantsEffects (console :: CONSOLE | e)) Unit
 main = do
@@ -70,7 +71,7 @@ main = do
     case t of
       Nothing -> liftEff' (log "Couldn't get a token! :(")
       Just t' -> do
-        connection <- liftEff (WS.create (WS.URL ("ws://localhost:8000/state_updates/" <> t')) [])
+        connection <- liftEff $ WS.create (WS.URL $ createWSURL $ "/state_updates/" <> t') []
         driver     <- runUI LP.component (st { token = Just t' }) body
         pfest (wsProducer connection)      (consumerToQuery driver.query LP.WSMsg)
         pfest (routeProducer LP.locations) (consumerToQuery driver.query LP.ChangePage)
@@ -80,7 +81,7 @@ main = do
 
     getToken :: Aff (LemmingPantsEffects (console :: CONSOLE | e)) (Maybe String)
     getToken = do
-      r <- PG.post "http://localhost:3000/rpc/get_token" ""
+      r <- PG.post (createURL "/rpc/get_token") ""
       case parseToken r.response of
         Left  es -> logShow (foldMap renderForeignError es) *> pure Nothing
         Right ts -> pure (map (\t -> t.token) (A.head ts))

@@ -11,6 +11,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Network.HTTP.StatusCode (StatusCode(..))
+import Postgrest (createURL)
 import Postgrest as PG
 import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<>), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
@@ -106,7 +107,7 @@ component =
         Right (AgendaItem c) -> do
           s  <- H.get
           er <- H.liftAff (PG.emptyResponse
-                  "http://localhost:3000/rpc/set_current_agenda_item"
+                  (createURL "/rpc/set_current_agenda_item")
                   s.token
                   POST
                   {id: c.id})
