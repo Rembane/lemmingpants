@@ -16,7 +16,7 @@ CREATE FUNCTION api.login(username TEXT, password TEXT) RETURNS jwt_token
                 'r'::TEXT as mode
             FROM model.role
             RIGHT OUTER JOIN model.users ON (model.role.id = model.users.role_id)
-            WHERE (username=username AND pwhash=model.crypt(password, pwhash))
+            WHERE (username=username AND pwhash=crypt(password, pwhash))
         ) r;
     $$;
 

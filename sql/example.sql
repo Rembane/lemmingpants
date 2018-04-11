@@ -1,6 +1,7 @@
 -- Example data  -------------------------------------------------------------
 
 SET SCHEMA 'model';
+SET search_path TO model, public;
 
 INSERT INTO role(name) VALUES('web_anon');
 INSERT INTO role(name) VALUES('insert_attendee_user');
