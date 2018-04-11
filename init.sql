@@ -9,11 +9,6 @@ DROP SCHEMA IF EXISTS api CASCADE;
 CREATE SCHEMA api AUTHORIZATION lemmingpants;
 GRANT ALL PRIVILEGES ON SCHEMA api TO lemmingpants;
 
-DROP EXTENSION IF EXISTS pgcrypto CASCADE;
-CREATE EXTENSION pgcrypto WITH SCHEMA model;
-DROP EXTENSION IF EXISTS pgjwt CASCADE;
-CREATE EXTENSION pgjwt;
-
 CREATE TYPE api.state AS ENUM ('init', 'active', 'done');
 
 \i sql/role.sql
