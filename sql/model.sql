@@ -1,6 +1,6 @@
 SET SCHEMA 'model';
 
-GRANT USAGE ON SCHEMA model TO web_anon, insert_attendee_user, admin_user, lemmingpants;
+GRANT USAGE ON SCHEMA model TO web_anon, admin_user, lemmingpants;
 
 -- Auth ---------------------------------------------------------------------
 
@@ -29,4 +29,4 @@ CREATE FUNCTION send_websocket_notification(event TEXT, message json) RETURNS vo
 
 REVOKE ALL ON FUNCTION send_websocket_notification(event TEXT, message json) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION send_websocket_notification(event TEXT, message json)
-    TO web_anon, insert_attendee_user, admin_user, lemmingpants;
+    TO web_anon, admin_user, lemmingpants;

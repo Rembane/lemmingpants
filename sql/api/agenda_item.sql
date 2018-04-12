@@ -10,7 +10,7 @@ CREATE TABLE agenda_item (
 -- Only one agenda item may be active at the time.
 CREATE UNIQUE INDEX ON agenda_item (state) WHERE state='active';
 
-GRANT SELECT ON agenda_item TO admin_user, insert_attendee_user, web_anon;
+GRANT SELECT ON agenda_item TO admin_user, web_anon;
 GRANT UPDATE ON agenda_item TO admin_user;
 GRANT REFERENCES ON agenda_item TO admin_user;
 

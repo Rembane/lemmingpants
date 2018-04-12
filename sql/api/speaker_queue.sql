@@ -5,7 +5,7 @@ CREATE TABLE speaker_queue (
     agenda_item_id INTEGER REFERENCES agenda_item NOT NULL,
     state          state DEFAULT 'init' NOT NULL
 );
-REVOKE ALL ON TABLE speaker_queue FROM admin_user, insert_attendee_user, web_anon, PUBLIC;
+REVOKE ALL ON TABLE speaker_queue FROM admin_user, web_anon, PUBLIC;
 GRANT INSERT (agenda_item_id, state) ON speaker_queue TO admin_user;
 GRANT UPDATE (state) ON speaker_queue TO admin_user;
 GRANT REFERENCES ON speaker_queue TO admin_user;

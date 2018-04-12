@@ -7,14 +7,14 @@ CREATE TABLE attendee (
     nick    TEXT,
     created TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-GRANT SELECT ON attendee TO insert_attendee_user, admin_user, web_anon;
+GRANT SELECT ON attendee TO admin_user, web_anon;
 
 CREATE TABLE attendee_number (
     id          SERIAL PRIMARY KEY,
     attendee_id INTEGER REFERENCES attendee NOT NULL,
     created     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-GRANT SELECT ON attendee_number TO insert_attendee_user, admin_user, web_anon;
+GRANT SELECT ON attendee_number TO admin_user, web_anon;
 
 CREATE FUNCTION attendee_number_news() RETURNS TRIGGER
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = api, model, public, pg_temp
@@ -54,4 +54,4 @@ CREATE FUNCTION create_attendee(id INTEGER, cid TEXT, name TEXT, nick TEXT DEFAU
   END
   $$;
 REVOKE ALL ON FUNCTION create_attendee(INTEGER, TEXT, TEXT, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION create_attendee(INTEGER, TEXT, TEXT, TEXT) TO web_anon, insert_attendee_user, admin_user;
+GRANT EXECUTE ON FUNCTION create_attendee(INTEGER, TEXT, TEXT, TEXT) TO web_anon, admin_user;
