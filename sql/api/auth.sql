@@ -12,7 +12,7 @@ CREATE FUNCTION api.login(username TEXT, password TEXT) RETURNS jwt_token
         FROM (
             SELECT
                 role.name::TEXT AS role,
-                extract(EPOCH FROM NOW())::INTEGER + 3600 AS exp,
+                extract(EPOCH FROM NOW())::INTEGER + 86400 AS exp,
                 'r'::TEXT as mode
             FROM model.role
             RIGHT OUTER JOIN model.users ON (model.role.id = model.users.role_id)
@@ -29,7 +29,7 @@ CREATE FUNCTION api.get_token() RETURNS jwt_token
   LANGUAGE sql SECURITY DEFINER SET search_path = api, model, public, pg_temp
   AS $$
     -- Sign encrypts using HS256 by default.
-    SELECT sign(json_build_object('role', 'web_anon', 'exp', extract(EPOCH FROM NOW())::INTEGER + 3600, 'mode', 'r'),
+    SELECT sign(json_build_object('role', 'web_anon', 'exp', extract(EPOCH FROM NOW())::INTEGER + 86400, 'mode', 'r'),
         current_setting('app.jwt_secret')) AS token;
   $$;
 
