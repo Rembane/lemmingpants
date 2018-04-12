@@ -2,7 +2,7 @@ all: package
 
 package: compile
 	cat main.js | closure-compiler > main2.js
-	mv main2.js main.js
+	mv main2.js ../static/main.js
 
 compile:
 	pulp browserify -O > main.js
