@@ -1,7 +1,7 @@
 module Components.Overhead where
 
 import Data.Either (Either(Right, Left))
-import Data.Maybe (maybe, maybe')
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -36,7 +36,10 @@ component =
           HH.text e
         Right ai@(AgendaItem ai') ->
           HH.div_
-            [ HH.h1_ [HH.text ai'.title]
+            [ HH.h1_
+              case ai'.supertitle of
+                Nothing -> [HH.text ai'.title]
+                Just st -> [HH.text st, HH.br_, HH.text ai'.title]
             , maybe'
                 (\_ -> HH.p_ [HH.text "ERROR: No speakerqueue found!"])
                 (\(SpeakerQueue sq) ->

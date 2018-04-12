@@ -1,11 +1,11 @@
 SET SCHEMA 'api';
 
 CREATE TABLE agenda_item (
-    id      SERIAL PRIMARY KEY,
-    title   TEXT NOT NULL,
-    content TEXT NOT NULL,
-    order_  SERIAL,
-    state   state DEFAULT 'init' NOT NULL
+    id         SERIAL PRIMARY KEY,
+    supertitle TEXT,
+    title      TEXT NOT NULL,
+    order_     SERIAL,
+    state      state DEFAULT 'init' NOT NULL
 );
 -- Only one agenda item may be active at the time.
 CREATE UNIQUE INDEX ON agenda_item (state) WHERE state='active';

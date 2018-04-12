@@ -36,8 +36,8 @@ import Type.Prelude (SProxy(..))
 
 newtype AgendaItem = AgendaItem
   { id            :: Int
+  , supertitle    :: Maybe String
   , title         :: String
-  , content       :: String
   , order_        :: Int
   , state         :: String
   , speakerQueues :: L.List SpeakerQueue

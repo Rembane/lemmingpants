@@ -181,11 +181,11 @@ component =
 
         -- TODO: Make _ALL_ the go functions scream and shout if they can't update stuff.
         handleAgendaItem
-          :: F { id      :: Int
-               , title   :: String
-               , content :: String
-               , order_  :: Int
-               , state   :: String
+          :: F { id         :: Int
+               , supertitle :: Maybe String
+               , title      :: String
+               , order_     :: Int
+               , state      :: String
                }
              -> WSAction
              -> State
@@ -202,8 +202,8 @@ component =
                   let (AgendaItem ai) = newAI air
                    in Just $ AgendaItem (ai { speakerQueues = x.speakerQueues })) ag)))
 
-            newAI { id, title, content, order_, state } =
-              AgendaItem {id, title, content, order_, state, speakerQueues: mempty }
+            newAI { id, supertitle, title, order_, state } =
+              AgendaItem {id, supertitle, title, order_, state, speakerQueues: mempty }
 
         handleAttendee :: F Attendee -> State -> F State
         handleAttendee fr state =
