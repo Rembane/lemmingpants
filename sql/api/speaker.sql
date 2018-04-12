@@ -10,7 +10,7 @@ CREATE TABLE speaker (
 -- At most one speaker per queue may be active at the time.
 CREATE UNIQUE INDEX ON speaker (speaker_queue_id, state) where state='active';
 
-REVOKE ALL ON TABLE speaker FROM admin_user, insert_attendee_user, web_anon, PUBLIC;
+REVOKE ALL ON TABLE speaker FROM admin_user, web_anon, PUBLIC;
 GRANT INSERT (speaker_queue_id, attendee_id, state) ON speaker TO admin_user;
 GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user;
 GRANT UPDATE (state) ON speaker TO admin_user;
@@ -71,31 +71,6 @@ CREATE TRIGGER speaker_news
     FOR EACH ROW
     EXECUTE PROCEDURE speaker_news();
 
-CREATE FUNCTION may_only_add_or_update_speaker_to_init_or_active_speaker_queue() RETURNS TRIGGER
-  LANGUAGE plpgsql
-  AS $$
-  DECLARE
-    is_init_or_active BOOLEAN;
-  BEGIN
-    SELECT (state = 'init') OR (state = 'active') INTO is_init_or_active
-    FROM speaker_queue
-    WHERE id = NEW.speaker_queue_id;
-
-    IF is_init_or_active
-      THEN
-        RETURN NEW;
-      ELSE
-        RAISE EXCEPTION 'You are trying to insert or update speakers on a done speaker queue. It is too late for that now.';
-        RETURN OLD;
-    END IF;
-  END
-  $$;
-
-CREATE TRIGGER may_only_add_or_update_speaker_to_init_or_active_speaker_queue
-  BEFORE INSERT OR UPDATE ON speaker
-  FOR EACH ROW
-  EXECUTE PROCEDURE may_only_add_or_update_speaker_to_init_or_active_speaker_queue();
-
 -- Returns the id of the new current speaker if things worked out well, 0 otherwise.
 CREATE FUNCTION set_current_speaker(id INTEGER) RETURNS INTEGER
     LANGUAGE plpgsql
@@ -105,7 +80,8 @@ CREATE FUNCTION set_current_speaker(id INTEGER) RETURNS INTEGER
     BEGIN
         IF EXISTS(SELECT 1 FROM speaker WHERE speaker.id=set_current_speaker.id) THEN
             UPDATE speaker SET state='done' WHERE state='active';
-            UPDATE speaker SET state='active' WHERE speaker.id=set_current_speaker.id RETURNING speaker.id INTO n;
+            UPDATE speaker SET state='active' WHERE speaker.id=set_current_speaker.id
+            RETURNING speaker.id INTO n;
             RETURN n;
         ELSE
             RETURN 0;
