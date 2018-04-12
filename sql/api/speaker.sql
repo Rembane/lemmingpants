@@ -76,10 +76,14 @@ CREATE FUNCTION set_current_speaker(id INTEGER) RETURNS INTEGER
     LANGUAGE plpgsql
     AS $$
     DECLARE
-        n INTEGER = 0;
+        n    INTEGER = 0;
+        sqid INTEGER = 0;
     BEGIN
         IF EXISTS(SELECT 1 FROM speaker WHERE speaker.id=set_current_speaker.id) THEN
-            UPDATE speaker SET state='done' WHERE state='active';
+            SELECT speaker_queue_id INTO sqid FROM speaker WHERE speaker.id = set_current_speaker.id;
+            UPDATE speaker SET state='done'
+                WHERE speaker.speaker_queue_id = sqid
+                AND state='active';
             UPDATE speaker SET state='active' WHERE speaker.id=set_current_speaker.id
             RETURNING speaker.id INTO n;
             RETURN n;
