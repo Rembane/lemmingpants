@@ -1,5 +1,9 @@
 SET SCHEMA 'api';
 
+-- Note: That if you ever let people update their cids or insert new cids
+--       from another vector than create_attendee then you _need_ to
+--       lowercase the cid.
+
 CREATE TABLE attendee (
     id      SERIAL PRIMARY KEY,
     cid     TEXT NOT NULL UNIQUE,
@@ -46,9 +50,9 @@ CREATE FUNCTION create_attendee(id INTEGER, cid TEXT, name TEXT, nick TEXT DEFAU
   DECLARE
     aid INTEGER;
   BEGIN
-    SELECT attendee.id INTO aid FROM attendee WHERE attendee.cid = create_attendee.cid;
+    SELECT attendee.id INTO aid FROM attendee WHERE attendee.cid = LOWER(create_attendee.cid);
     IF aid IS NULL
-      THEN INSERT INTO attendee(cid, name, nick) VALUES (create_attendee.cid, create_attendee.name, create_attendee.nick) RETURNING attendee.id INTO aid;
+      THEN INSERT INTO attendee(cid, name, nick) VALUES (LOWER(create_attendee.cid), create_attendee.name, create_attendee.nick) RETURNING attendee.id INTO aid;
     END IF;
     INSERT INTO attendee_number(id, attendee_id) VALUES (create_attendee.id, aid);
   END
