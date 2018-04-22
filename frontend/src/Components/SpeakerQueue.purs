@@ -77,7 +77,8 @@ component =
             , HH.table_
                 ([ HH.tr_
                   [ HH.th_ [ HH.text "ID"]
-                  , HH.th_ [ HH.text "Namn"]
+                  , HH.th_ [ HH.text "Name"]
+                  , HH.th_ [ HH.text "#Spoken"]
                   , HH.th_ [ HH.text " "]
                   ]
                 ] <>
@@ -86,6 +87,7 @@ component =
                     HH.tr_
                       [ HH.td_ [ HH.text (show s'.attendeeId) ]
                       , HH.td_ [ HH.text (visualizeSpeaker state.attendees s) ]
+                      , HH.td_ [ HH.text (show s'.timesSpoken) ]
                       , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
                       ])
                   sq.speakers))
