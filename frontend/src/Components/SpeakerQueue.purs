@@ -35,12 +35,13 @@ type State =
   }
 
 data Query a
-  = PushSQ            a
-  | PopSQ             a
-  | FormMsg F.Message a
-  | Next              a
-  | Eject             a
-  | GotNewState State a
+  = PushSQ                a
+  | PopSQ                 a
+  | FormMsg     F.Message a
+  | Next                  a
+  | Eject                 a
+  | Delete      Int       a
+  | GotNewState State     a
 
 data Message
   = Flash String
@@ -70,13 +71,24 @@ component =
           ]
         , HH.div_
             [ HH.p_
-              [ HH.strong_ [HH.text "Speaking: "]
+              [ HH.strong_ [ HH.text "Speaking: " ]
               , HH.text (maybe "–" (visualizeSpeaker state.attendees) sq.speaking)
               ]
-            , HH.ol_
+            , HH.table_
+                ([ HH.tr_
+                  [ HH.th_ [ HH.text "ID"]
+                  , HH.th_ [ HH.text "Namn"]
+                  , HH.th_ [ HH.text " "]
+                  ]
+                ] <>
                 (map
-                  (\s -> HH.li_ [HH.text (visualizeSpeaker state.attendees s) ])
-                  sq.speakers)
+                  (\s@(Speaker s') ->
+                    HH.tr_
+                      [ HH.td_ [ HH.text (show s'.attendeeId) ]
+                      , HH.td_ [ HH.text (visualizeSpeaker state.attendees s) ]
+                      , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
+                      ])
+                  sq.speakers))
             , HH.slot
               unit
               (F.component "Add speaker"
@@ -183,8 +195,17 @@ component =
                 _ ->
                   H.raise (Flash "SpeakerQueue.Eject -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
           *> pure next
+        Delete id_ next -> do
+          state <- H.get
+          r <- H.liftAff $ PG.emptyResponse
+                  (createURL $ "/speaker?id=eq." <> show id_)
+                  state.token
+                  PATCH
+                  { state: "deleted" }
+          case r.status of
+            StatusCode 204 -> -- The `Created` HTTP status code.
+              pure unit
+            _ ->
+              H.raise (Flash "SpeakerQueue.Delete -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+          *> pure next
         GotNewState s next -> H.put s *> pure next
-
-    activeSpeakersUrl :: String
-    activeSpeakersUrl = createURL "/active_speakers?select=id,attendeeId:attendee_id,state,timesSpoken:times_spoken"
-

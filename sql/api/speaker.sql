@@ -1,10 +1,16 @@
 SET SCHEMA 'api';
 
+-- A speaker can be deleted if it doesn't want to speak or has been added
+-- by mistake. I'm not really clear on why I don't just let speakers be
+-- deleted for real, but I do know that I really want to keep my
+-- consistensy badge.
+CREATE TYPE speaker_state AS ENUM ('init', 'active', 'done', 'deleted');
+
 CREATE TABLE speaker (
     id               SERIAL PRIMARY KEY,
     speaker_queue_id INTEGER REFERENCES speaker_queue NOT NULL,
     attendee_id      INTEGER REFERENCES attendee NOT NULL,
-    state            state DEFAULT 'init' NOT NULL,
+    state            speaker_state DEFAULT 'init' NOT NULL,
     created          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 -- At most one speaker per queue may be active at the time.

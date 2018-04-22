@@ -12,7 +12,7 @@ import Data.Maybe (Maybe(Nothing, Just), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Record (modify)
 import Data.Record.ShowRecord (showRecord)
-import Prelude (class Eq, class Ord, class Show, compare, ($), (/=), (<#>), (<<<), (<>), (==), (>>=), (>>>))
+import Prelude (class Eq, class Ord, class Show, compare, ($), (&&), (/=), (<#>), (<<<), (<>), (==), (>>=), (>>>))
 import Simple.JSON (class ReadForeign, readImpl)
 import Type.Prelude (SProxy(..))
 import Types.Speaker (Speaker(..))
@@ -47,7 +47,7 @@ instance ordSQ :: Ord SpeakerQueue where
     compare s2.id s1.id
 
 -- | Make sure that no speaker on the `speaking` position is done.
--- | And that no speaker in the queue is done.
+-- | And that no speaker in the queue is done or deleted.
 -- | And that no speaker first in the queue is active.
 invariantDance :: SpeakerQueue -> SpeakerQueue
 invariantDance = moveActive <<< removeDone
@@ -55,7 +55,7 @@ invariantDance = moveActive <<< removeDone
     removeDone :: SpeakerQueue -> SpeakerQueue
     removeDone (SpeakerQueue sq) =
       SpeakerQueue $ sq { speaking = sq.speaking >>= (\s@(Speaker s') -> if s'.state == "done" then Nothing else Just s)
-                        , speakers = A.filter (\(Speaker x) -> x.state /= "done") sq.speakers
+                        , speakers = A.filter (\(Speaker x) -> x.state /= "done" && x.state /= "deleted") sq.speakers
                         }
 
     moveActive :: SpeakerQueue -> SpeakerQueue
