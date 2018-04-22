@@ -31,7 +31,7 @@ import Types.Agenda as AG
 import Types.Attendee (Attendee, AttendeeDB, insertAttendee)
 import Types.Speaker (Speaker(..))
 import Types.SpeakerQueue (SpeakerQueue(..), addSpeaker, modifySpeaker)
-import Types.Token (Token, saveToken)
+import Types.Token (Payload(..), Token(..), removeToken, saveToken)
 
 type ChildQuery = Coproduct5 CR.Query CO.Query CA.Query CL.Query CH.Query
 type ChildSlot  = Either5 Int Int Int Int Int
@@ -65,6 +65,7 @@ type State =
 
 data Query a
   = ChangePage      Location   a
+  | SignOut                    a
   | AdminMsg        CA.Message a
   | LoginMsg        CL.Message a
   | RegistrationMsg CR.Message a
@@ -99,14 +100,26 @@ component =
         ) <>
         [ HH.ul_
           [ HH.li_ [HH.a [HP.href "#registration"] [HH.text "Registration"]]
-          , HH.li_ [HH.a [HP.href "#overhead"] [HH.text "Overhead"]]
-          , HH.li_ [HH.a [HP.href "#admin"]    [HH.text "Admin"]]
-          , HH.li_ [HH.a [HP.href "#login"]    [HH.text "Login"]]
-          , HH.li_ [HH.a [HP.href "#/"]        [HH.text "Home"]]
+          , HH.li_ [HH.a [HP.href "#overhead"]     [HH.text "Overhead"]]
+          , HH.li_ [HH.a [HP.href "#admin"]        [HH.text "Admin"]]
+          , loginlogoutlink state
+          , HH.li_ [HH.a [HP.href "#/"]            [HH.text "Home"]]
           ]
         , locationToSlot state.currentLocation state
         ])
       where
+        loginlogoutlink
+          :: State
+          -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
+        loginlogoutlink s =
+          let (Token t)   = s.token
+              (Payload p) = t.payload
+           in if p.role == "admin_user"
+                -- Blergh... hack... blergh...
+                -- TODO: Unhack this!
+                then HH.li_ [HH.a [HP.href "#signout", HE.onClick (HE.input_ SignOut)] [HH.text "Sign out"]]
+                else HH.li_ [HH.a [HP.href "#login"]   [HH.text "Login"]]
+
         locationToSlot
           :: Location
           -> State
@@ -136,6 +149,7 @@ component =
     eval =
       case _ of
         ChangePage l next -> H.modify (_ {currentLocation = l}) *> pure next
+        SignOut      next -> H.liftAff removeToken *> pure next
         AdminMsg   m next ->
           case m of
             CA.Flash s -> flash s next
