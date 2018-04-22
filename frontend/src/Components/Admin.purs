@@ -10,14 +10,15 @@ import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<>), (>>=))
+import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<>), (==), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
-import Types.Token (Token)
+import Types.Token (Payload(..), Token(..))
 
 type State =
   { agenda    :: Agenda
@@ -46,37 +47,50 @@ component =
   where
     render :: State -> H.ParentHTML Query SQ.Query Unit (Aff (LemmingPantsEffects e))
     render state =
-      HH.div_
-        ([ HH.h1_ [HH.text "Supreme council interface"]
-        , HH.h2_
-          [ HH.button
-            [ HE.onClick (HE.input_ PreviousAI) ]
-            [ HH.text "⇐" ]
-          , HH.text " "
-          , HH.text (either id id (map (\(AgendaItem a) -> a.title) currentAI))
-          , HH.text " "
-          , HH.button
-            [ HE.onClick (HE.input_ NextAI) ]
-            [ HH.text "⇒" ]
-          ]
-        ] <> either
-            (const [HH.text "No agenda item => no speaker queue."])
-            (\ai@(AgendaItem ai') ->
-              let sqHeight = L.length ai'.speakerQueues in
-              [ HH.p_ [ HH.text ("Speaker queue stack height: " <> show sqHeight) ]
-              , case AG.topSQ ai of
-                  Nothing -> HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
-                  Just sq ->
-                    HH.slot
-                      unit
-                      SQ.component
-                      { speakerQueue: sq, token: state.token, attendees: state.attendees, agendaItemId: ai'.id, sqHeight }
-                      (HE.input SQMsg)
-              ])
-            currentAI
-        )
+      if pl.role == "admin_user"
+        then
+          HH.div_
+            ([ HH.h1_ [HH.text "The Secret Supreme Council Interface"]
+            , HH.h2_
+              [ HH.button
+                [ HE.onClick (HE.input_ PreviousAI) ]
+                [ HH.text "⇐" ]
+              , HH.text " "
+              , HH.text (either id id (map (\(AgendaItem a) -> a.title) currentAI))
+              , HH.text " "
+              , HH.button
+                [ HE.onClick (HE.input_ NextAI) ]
+                [ HH.text "⇒" ]
+              ]
+            ] <> either
+                (const [HH.text "No agenda item => no speaker queue."])
+                (\ai@(AgendaItem ai') ->
+                  let sqHeight = L.length ai'.speakerQueues in
+                  [ HH.p_ [ HH.text ("Speaker queue stack height: " <> show sqHeight) ]
+                  , case AG.topSQ ai of
+                      Nothing -> HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
+                      Just sq ->
+                        HH.slot
+                          unit
+                          SQ.component
+                          { speakerQueue: sq, token: state.token, attendees: state.attendees, agendaItemId: ai'.id, sqHeight }
+                          (HE.input SQMsg)
+                  ])
+                currentAI
+            )
+        else
+          HH.div_
+            [ HH.p_
+              [ HH.text "Please "
+              , HH.a
+                  [ HP.href "#login" ]
+                  [ HH.text "login"  ]
+              , HH.text " to access the admin interface."
+              ]
+            ]
       where
-        currentAI = AG.getCurrentAI state.agenda
+        currentAI    = AG.getCurrentAI state.agenda
+        (Payload pl) = let (Token t) = state.token in t.payload
 
     eval :: Query ~> H.ParentDSL State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e))
     eval =
