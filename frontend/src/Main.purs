@@ -9,12 +9,17 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 import Control.Monad.Eff.Exception (throw)
+import Control.Monad.Eff.Now (now)
 import Coroutines (consumerToQuery, routeProducer)
 import DOM.Websocket.WebSocket as WS
 import Data.Bifunctor (rmap)
+import Data.DateTime.Instant (instant)
 import Data.Either (Either(Right, Left), either)
 import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
+import Data.Int (toNumber)
+import Data.Maybe (maybe)
+import Data.Time.Duration (Milliseconds(..))
 import Data.Validation.Semigroup (V, invalid, unV)
 import Debug.Trace (traceA)
 import Effects (LemmingPantsEffects)
@@ -23,12 +28,12 @@ import Halogen.VDom.Driver (runUI)
 import Lemmingpants as LP
 import Network.HTTP.Affjax as AX
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, discard, pure, void, ($), (*>), (<#>), (<$>), (<*>), (<<<), (<>))
+import Prelude (type (~>), Unit, bind, discard, pure, void, ($), (*), (*>), (<#>), (<$>), (<*>), (<<<), (<>), (>), (>>=))
 import Simple.JSON (read)
 import Types.Agenda (Agenda)
 import Types.Agenda as AG
 import Types.Attendee (Attendee, newAttendeeDB)
-import Types.Token (Token(..), loadToken, saveToken)
+import Types.Token (Payload(..), Token(..), loadToken, removeToken, saveToken)
 import Websockets (wsProducer)
 
 parseAgenda :: Foreign -> Either MultipleErrors Agenda
@@ -68,6 +73,8 @@ loadInitialState = do
     initialAgendaUrl = PG.createURL "/agenda_item?select=*,speakerQueues:speaker_queue(id,state,speakers:active_speakers(id,attendeeId:attendee_id,state,timesSpoken:times_spoken))&speaker_queue.state=in.(init,active)&order=order_.asc&order=speaker_queue.id.asc&speaker_queue.active_speakers.state=in.(init,active)"
     initialAttendeesUrl = PG.createURL "/attendee?select=id,cid,name,nick,numbers:attendee_number(id)"
 
+    -- | Get a new token if the current token is too old.
+    -- | Otherwise, make do with the one saved in local storage.
     loadOrGetNewToken :: Aff (LemmingPantsEffects e) (Either MultipleErrors Token)
     loadOrGetNewToken = do
       et <- loadToken
@@ -75,7 +82,13 @@ loadInitialState = do
         Left  _ ->
           PG.requestAnonymousToken
             <#> \t -> rmap (saveToken) t *> t
-        Right t -> (pure <<< pure) t
+        Right t@(Token t') ->
+          (liftEff' now) >>= \n ->
+            let (Payload p) = t'.payload
+                mexp        = instant (Milliseconds (toNumber (p.exp * 1000)))
+             in if maybe false (_ > n) mexp
+                  then (pure <<< pure) t
+                  else removeToken *> loadOrGetNewToken -- The recursion hack!
 
 main :: forall e. Eff (LemmingPantsEffects (console :: CONSOLE | e)) Unit
 main = do

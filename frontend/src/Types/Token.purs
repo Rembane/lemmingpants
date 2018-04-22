@@ -4,9 +4,10 @@ module Types.Token
   , parseToken
   , saveToken
   , loadToken
+  , removeToken
   ) where
 
-import Browser.WebStorage (WEB_STORAGE, getItem, localStorage, setItem)
+import Browser.WebStorage (WEB_STORAGE, getItem, localStorage, removeItem, setItem)
 import Control.Error.Util ((!?))
 import Control.Monad.Aff (Aff, liftEff')
 import Control.Monad.Eff.Exception (Error)
@@ -14,7 +15,7 @@ import Control.Monad.Except.Trans (except, runExceptT)
 import Data.Array as A
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..), note)
-import Data.Foreign (ForeignError(ForeignError), MultipleErrors)
+import Data.Foreign (ForeignError(..), MultipleErrors)
 import Data.Function.Uncurried (Fn3, runFn3)
 import Data.Newtype (class Newtype)
 import Data.Record.ShowRecord (showRecord)
@@ -80,3 +81,5 @@ loadToken = liftEff' $ runExceptT $
     >>= parseToken
     >>> except
 
+removeToken :: forall e. Aff (webStorage :: WEB_STORAGE | e) Unit
+removeToken = liftEff' $ removeItem localStorage tokenKey
