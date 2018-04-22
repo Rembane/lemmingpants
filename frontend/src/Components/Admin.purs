@@ -17,10 +17,11 @@ import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
+import Types.Token (Token)
 
 type State =
   { agenda    :: Agenda
-  , token     :: Maybe String
+  , token     :: Token
   , attendees :: AttendeeDB
   }
 type Input = State
@@ -105,17 +106,14 @@ component =
         Left s ->
           H.raise (Flash s)
         Right (AgendaItem c) -> do
-          s  <- H.get
-          er <- H.liftAff (PG.emptyResponse
-                  (createURL "/rpc/set_current_agenda_item")
-                  s.token
-                  POST
-                  {id: c.id})
-          case er of
-            Left  m -> H.raise (Flash m)
-            Right r ->
-              case r.status of
-                StatusCode 200 ->
-                  pure unit
-                _ ->
-                  H.raise (Flash "setCurrentAgendaItem -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+          s <- H.get
+          r <- H.liftAff (PG.emptyResponse
+                 (createURL "/rpc/set_current_agenda_item")
+                 s.token
+                 POST
+                 {id: c.id})
+          case r.status of
+            StatusCode 200 ->
+              pure unit
+            _ ->
+              H.raise (Flash "setCurrentAgendaItem -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")

@@ -4,20 +4,21 @@ import Components.Forms as F
 import Components.Forms.Field (mkField)
 import Control.Monad.Aff (Aff)
 import Data.Array as A
-import Data.Either (Either(..))
+import Data.Either (Either(..), note)
 import Data.Foldable (foldMap)
-import Data.Foreign (Foreign, MultipleErrors, renderForeignError)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Foreign (Foreign, ForeignError(..), MultipleErrors, renderForeignError)
+import Data.Maybe (Maybe(Nothing))
 import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Partial.Unsafe (unsafePartial)
+import Network.HTTP.Affjax as AX
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, discard, pure, unit, ($), (*>))
+import Prelude (type (~>), Unit, bind, const, discard, pure, unit, ($), (*>), (<<<), (>>=))
 import Simple.JSON (read)
+import Types.Token (Token, parseToken)
 
 type State = Unit
 
@@ -25,7 +26,7 @@ data Query a
   = FormMsg F.Message a
 
 data Message
-  = NewToken String
+  = NewToken Token
   | Flash    String
 
 
@@ -60,13 +61,18 @@ component =
           case m of
             F.FormSubmitted m' -> do
               r <- H.liftAff $ PG.post (createURL "/rpc/login") m'
-              case parseToken r.response of
-                Left  es -> H.raise (Flash (foldMap renderForeignError es))
-                Right ts -> let t = unsafePartial (fromJust (A.head ts))
-                             in H.raise (NewToken t.token)
-                             *> H.raise (Flash "You are now logged in!")
+              case result r of
+                Left  es -> H.raise $ Flash $ foldMap renderForeignError es
+                Right t  -> (H.raise $ NewToken t)
+                           *> (H.raise $ Flash "You are now logged in!")
               pure next
 
       where
-        parseToken :: Foreign -> Either MultipleErrors (Array { token :: String })
-        parseToken = read
+        pt :: Foreign -> Either MultipleErrors (Array { token :: String })
+        pt = read
+
+        result :: AX.AffjaxResponse Foreign -> Either MultipleErrors Token
+        result r =
+          pt r.response
+            >>= note (pure $ ForeignError "Expected array with length >0, got something else... from: /rpc/login") <<< A.head
+            >>= \t -> parseToken t.token

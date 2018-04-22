@@ -3,9 +3,8 @@ module Components.Registration where
 import Components.Forms as F
 import Components.Forms.Field (mkField)
 import Control.Monad.Aff (Aff)
-import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
+import Data.Maybe (Maybe(Just), fromMaybe)
 import Data.Monoid (mempty)
 import Data.StrMap (delete, lookup)
 import Data.String (null)
@@ -18,23 +17,24 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, discard, pure, unit, (*>), (<$>), (<>))
+import Prelude (type (~>), Unit, bind, discard, id, pure, unit, (*>), (<$>), (<>))
+import Types.Token (Token)
 
-type State = { token :: Maybe String }
-
-data Query a
-  = HandleInput (Maybe String) a
-  | FormMsg F.Message a
+type State = { token :: Token }
 
 -- | The token, if there is one.
-type Input = Maybe String
+type Input = State
+
+data Query a
+  = HandleInput Input a
+  | FormMsg F.Message a
 
 data Message = Flash String
 
 component :: forall e. H.Component HH.HTML Query Input Message (Aff (LemmingPantsEffects e))
 component =
   H.parentComponent
-    { initialState: \i -> { token: i }
+    { initialState: id
     , render
     , eval
     , receiver
@@ -44,20 +44,17 @@ component =
     render state =
       HH.div_
         [ HH.h1_ [HH.text "Registration"]
-        , case state.token of
-            Nothing -> HH.p_ [ HH.text "You need to be logged in. Please login!" ]
-            Just _  ->
-              HH.slot
-                unit
-                (F.component "I am attending this meeting!"
-                  [ mkField "id"   "Number"           [HP.type_ HP.InputNumber, HP.required true]
-                  , mkField "cid"  "CID"              [HP.type_ HP.InputText,   HP.required true]
-                  , mkField "name" "Full name"        [HP.type_ HP.InputText,   HP.required true]
-                  , mkField "nick" "Nickname, if any" [HP.type_ HP.InputText,   HP.required false]
-                  ]
-                )
-                unit
-                (HE.input FormMsg)
+        , HH.slot
+            unit
+            (F.component "I am attending this meeting!"
+              [ mkField "id"   "Number"           [HP.type_ HP.InputNumber, HP.required true]
+              , mkField "cid"  "CID"              [HP.type_ HP.InputText,   HP.required true]
+              , mkField "name" "Full name"        [HP.type_ HP.InputText,   HP.required true]
+              , mkField "nick" "Nickname, if any" [HP.type_ HP.InputText,   HP.required false]
+              ]
+            )
+            unit
+            (HE.input FormMsg)
         ]
 
     eval :: Query ~> H.HalogenM State Query F.Query Unit Message (Aff (LemmingPantsEffects e))
@@ -71,20 +68,16 @@ component =
                             Just true -> delete "nick" m'
                             _         -> m'
                 token <- H.gets (\s -> s.token)
-                er    <- H.liftAff (PG.signedInAjax (createURL "/rpc/create_attendee") token POST mempty m'')
-                case er of
-                  Left es -> H.raise (Flash es)
-                  Right r ->
-                    case r.status of
-                      -- The Location-header contains the new Attendee URL.
-                      StatusCode 200 -> do -- The `Created` HTTP status code.
-                        H.raise (Flash ("Thank you for registering, " <> fromMaybe "ERROR! EXTERMINATE!" (lookup "name" m')))
-                      _ ->
-                        traceAnyA r *> traceA r.response
+                r     <- H.liftAff (PG.signedInAjax (createURL "/rpc/create_attendee") token POST mempty m'')
+                case r.status of
+                  -- The Location-header contains the new Attendee URL.
+                  StatusCode 200 -> do -- The `Created` HTTP status code.
+                    H.raise (Flash ("Thank you for registering, " <> fromMaybe "ERROR! EXTERMINATE!" (lookup "name" m')))
+                  _ ->
+                    traceAnyA r *> traceA r.response
                 pure next
         HandleInput mt next ->
-          H.modify (\s -> s { token = mt })
-          *> pure next
+          H.put mt *> pure next
 
     receiver :: Input -> Maybe (Query Unit)
     receiver = HE.input HandleInput

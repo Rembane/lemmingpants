@@ -1,6 +1,5 @@
 module Lemmingpants where
 
-import Browser.WebStorage (localStorage, setItem)
 import Components.Admin as CA
 import Components.Home as CH
 import Components.Login as CL
@@ -32,6 +31,7 @@ import Types.Agenda as AG
 import Types.Attendee (Attendee, AttendeeDB, insertAttendee)
 import Types.Speaker (Speaker(..))
 import Types.SpeakerQueue (SpeakerQueue(..), addSpeaker, modifySpeaker)
+import Types.Token (Token, saveToken)
 
 type ChildQuery = Coproduct5 CR.Query CO.Query CA.Query CL.Query CH.Query
 type ChildSlot  = Either5 Int Int Int Int Int
@@ -57,7 +57,7 @@ locations
 
 type State =
   { currentLocation :: Location
-  , token           :: Maybe String
+  , token           :: Token
   , flash           :: Maybe String
   , agenda          :: Agenda
   , attendees       :: AttendeeDB
@@ -70,10 +70,7 @@ data Query a
   | RegistrationMsg CR.Message a
   | WSMsg           String     a
 
-tokenKey :: String
-tokenKey = "token"
-
-type Input = { token :: Maybe String, agenda :: Agenda, attendees :: AttendeeDB }
+type Input = { token :: Token, agenda :: Agenda, attendees :: AttendeeDB }
 
 component :: forall e. H.Component HH.HTML Query Input Void (Aff (LemmingPantsEffects e))
 component =
@@ -116,11 +113,11 @@ component =
           -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
         locationToSlot l s =
           case l of
-            Registration -> go CP.cp1 1 CR.component s.token (HE.input RegistrationMsg)
-            Overhead     -> go CP.cp2 2 CO.component ohs     (const Nothing)
-            Admin        -> go CP.cp3 3 CA.component s'      (HE.input AdminMsg)
-            Login        -> go CP.cp4 4 CL.component unit    (HE.input LoginMsg)
-            Home         -> go CP.cp5 5 CH.component unit    (const Nothing)
+            Registration -> go CP.cp1 1 CR.component rs   (HE.input RegistrationMsg)
+            Overhead     -> go CP.cp2 2 CO.component ohs  (const Nothing)
+            Admin        -> go CP.cp3 3 CA.component s'   (HE.input AdminMsg)
+            Login        -> go CP.cp4 4 CL.component unit (HE.input LoginMsg)
+            Home         -> go CP.cp5 5 CH.component unit (const Nothing)
           where
             go :: forall g i o
              . CP.ChildPath g ChildQuery Int ChildSlot
@@ -131,6 +128,7 @@ component =
             -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
             go cp p c i f = HH.slot' cp p c i f
 
+            rs  = { token: s.token }
             s'  = { token: s.token, agenda: s.agenda, attendees: s.attendees }
             ohs = { agenda: s.agenda, attendees: s.attendees }
 
@@ -144,8 +142,8 @@ component =
         LoginMsg   m next ->
           case m of
             CL.NewToken t ->
-              H.modify (_ {token = Just t})
-              *> H.liftEff (setItem localStorage tokenKey t)
+              H.modify (_ {token = t})
+              *> H.liftAff (saveToken t)
               *> pure next
             CL.Flash s -> flash s next
         RegistrationMsg m next ->
