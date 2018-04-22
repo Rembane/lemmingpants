@@ -13,8 +13,11 @@ CREATE TABLE speaker (
     state            speaker_state DEFAULT 'init' NOT NULL,
     created          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
--- At most one speaker per queue may be active at the time.
+-- At most one speaker per queue may be active at the same time.
 CREATE UNIQUE INDEX ON speaker (speaker_queue_id, state) where state='active';
+
+-- At most one attendee per queue may be init or active at the same time.
+CREATE UNIQUE INDEX ON speaker (speaker_queue_id, attendee_id) where state IN ('active', 'init');
 
 REVOKE ALL ON TABLE speaker FROM admin_user, web_anon, PUBLIC;
 GRANT INSERT (speaker_queue_id, attendee_id, state) ON speaker TO admin_user;

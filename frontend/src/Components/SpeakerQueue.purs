@@ -160,6 +160,8 @@ component =
                       case r.status of
                         StatusCode 201 -> -- The `Created` HTTP status code.
                           pure unit
+                        StatusCode 409 -> -- We can only have a visible speaker once per speaker queue.
+                          H.raise (Flash "I'm sorry, but you cannot add a speaker while it still is in the speaker queue.")
                         _ ->
                           H.raise (Flash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
           *> pure next
