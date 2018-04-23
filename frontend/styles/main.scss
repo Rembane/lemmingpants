@@ -3,11 +3,25 @@
 @import "base/base";
 
 body {
-    margin: 0 0 ($base-spacing * 2);
+  margin: 0 0 ($base-spacing * 2);
 }
 
 .container {
-    @include margin(null auto);
-    @include padding(null $base-spacing);
-    max-width: 720px;
+  @include margin(null auto);
+  @include padding(null $base-spacing);
+  max-width: 720px;
+}
+
+/* Menu */
+menu {
+  background-color: #333;
+  & li {
+    display: inline-block;
+    margin-left: 0.1em;
+    & a {
+      text-decoration: none;
+      font-weight: bold;
+      color: #fff;
+    }
+  }
 }

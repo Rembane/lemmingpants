@@ -99,13 +99,14 @@ component =
             Nothing -> []
             Just  s -> [ HH.div_ [ HH.text s ] ]
         ) <>
-        [ HH.ul_
-          [ HH.li_ [HH.a [HP.href "#registration"] [HH.text "Registration"]]
-          , HH.li_ [HH.a [HP.href "#overhead"]     [HH.text "Overhead"]]
-          , HH.li_ [HH.a [HP.href "#admin"]        [HH.text "Admin"]]
-          , loginlogoutlink state
-          , HH.li_ [HH.a [HP.href "#/"]            [HH.text "Home"]]
-          ]
+        [ HH.nav_
+          [ HH.menu_
+            [ HH.li_ [HH.a [HP.href "#registration"] [HH.text "Registration"]]
+            , HH.li_ [HH.a [HP.href "#overhead"]     [HH.text "Overhead"]]
+            , HH.li_ [HH.a [HP.href "#admin"]        [HH.text "Admin"]]
+            , loginlogoutlink state
+            , HH.li_ [HH.a [HP.href "#/"]            [HH.text "Home"]]
+            ]]
         , locationToSlot state.currentLocation state
         ])
       where
