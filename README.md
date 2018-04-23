@@ -14,7 +14,8 @@ Install the programs below and rock on!
 - Postgresql
 - PGJWT: https://github.com/michelp/pgjwt
 - postgres-websockets https://github.com/diogob/postgres-websockets
-- A web server of your choice (example configurations for NGINX are in the pipeline)
+- Some SASS binary on your `$PATH`. There are a couple to choose between. libsass and SassC are used in development, so if you use them it should just work. https://sass-lang.com/libsass
+- A web server of your choice, there's an example configuration in conf.d/nginx.conf.
 
 ### Initialize the database
 
@@ -28,4 +29,4 @@ psql -d lemmingpants < init.sql
 
 ## Running in dev-mode
 
-For development, the local web-server that serves the static resources is run by with this command `./de-server.sh`
+For development, the local web-server that serves the static resources is run by with this command `./dev-server.sh`

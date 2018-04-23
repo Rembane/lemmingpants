@@ -47,9 +47,9 @@ component =
         , HH.slot
             unit
             (F.component "I am attending this meeting!"
-              [ mkField "id"   "Number"           [HP.type_ HP.InputNumber, HP.required true]
-              , mkField "cid"  "CID"              [HP.type_ HP.InputText,   HP.required true]
-              , mkField "name" "Full name"        [HP.type_ HP.InputText,   HP.required true]
+              [ mkField "id"   "Number *"         [HP.type_ HP.InputNumber, HP.required true]
+              , mkField "cid"  "CID *"            [HP.type_ HP.InputText,   HP.required true]
+              , mkField "name" "Full name *"      [HP.type_ HP.InputText,   HP.required true]
               , mkField "nick" "Nickname, if any" [HP.type_ HP.InputText,   HP.required false]
               ]
             )

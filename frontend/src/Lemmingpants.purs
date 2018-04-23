@@ -93,7 +93,8 @@ component =
 
     render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
     render state =
-      HH.div_
+      HH.div
+        [HP.class_ (HH.ClassName "container")]
         (( case state.flash of
             Nothing -> []
             Just  s -> [ HH.div_ [ HH.text s ] ]

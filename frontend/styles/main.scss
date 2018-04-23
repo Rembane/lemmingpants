@@ -1,0 +1,13 @@
+@import "neat/neat";
+@import "bourbon/bourbon";
+@import "base/base";
+
+body {
+    margin: 0 0 ($base-spacing * 2);
+}
+
+.container {
+    @include margin(null auto);
+    @include padding(null $base-spacing);
+    max-width: 720px;
+}

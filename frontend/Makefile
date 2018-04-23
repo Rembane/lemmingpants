@@ -10,5 +10,8 @@ compile:
 dev: compile
 	 cp main.js ../static/
 
+styles: ../static/bundle.css
+	sassc -I styles/ styles/main.scss > ../static/bundle.css
+
 clean:
 	rm -rf .psc-package/ .pulp-cache/ .psci_modules/ bower_components/ output/

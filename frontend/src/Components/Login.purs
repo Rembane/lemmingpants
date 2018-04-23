@@ -46,8 +46,8 @@ component =
         , HH.slot
             unit
             (F.component "Login!"
-              [ mkField "username" "Username" [HP.type_ HP.InputText,     HP.required true]
-              , mkField "password" "Password" [HP.type_ HP.InputPassword, HP.required true]
+              [ mkField "username" "Username *" [HP.type_ HP.InputText,     HP.required true]
+              , mkField "password" "Password *" [HP.type_ HP.InputPassword, HP.required true]
               ]
             )
             unit
