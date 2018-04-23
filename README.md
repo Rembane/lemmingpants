@@ -1,6 +1,6 @@
-# Lemming pants
+# Lemmingpants
 
-The purpose of this project is to develop a system to manage the speaker list of Datateknologsektionens meetings. Preferably in the simplest possible way.
+The purpose of this project is to develop a system to manage the speaker list of Datateknologsektionens meetings.
 
 Feel free to fork, do pull requests and post issues!
 
@@ -8,13 +8,14 @@ The name is much inspired by DHack's totem animal, the [lemming](https://www.you
 
 ## Installation
 
-Install the programs below and rock on!
+For development you should be good to go if you install the programs below:
 
-- Postgrest https://github.com/begriffs/postgrest
-- Postgresql
+- Postgresql >= 9.6
+- Postgrest: https://github.com/begriffs/postgrest
 - PGJWT: https://github.com/michelp/pgjwt
-- postgres-websockets https://github.com/diogob/postgres-websockets
-- A web server of your choice (example configurations for NGINX are in the pipeline)
+- postgres-websockets: https://github.com/diogob/postgres-websockets
+- Some SASS binary on your `$PATH`. There are a couple to choose between. libsass and SassC are used in development, so if you use them it should just work. https://sass-lang.com/libsass
+- A decent Purescript distribution
 
 ### Initialize the database
 
@@ -28,4 +29,8 @@ psql -d lemmingpants < init.sql
 
 ## Running in dev-mode
 
-For development, the local web-server that serves the static resources is run by with this command `./de-server.sh`
+For development, the local web-server that serves the static resources is run with this command `./dev-server.sh`
+
+## Building the frontend
+
+Build the frontend by running `make dev` in the `frontend/` directory.

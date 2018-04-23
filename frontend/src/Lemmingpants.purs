@@ -14,15 +14,16 @@ import Data.Either.Nested (Either5)
 import Data.Foldable (foldMap)
 import Data.Foreign (F, Foreign, ForeignError(..), fail, renderForeignError)
 import Data.Functor.Coproduct.Nested (Coproduct5)
-import Data.Maybe (Maybe(Nothing, Just), fromMaybe)
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Data.Monoid (mempty)
+import Data.String (toLower)
 import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (type (~>), Unit, Void, const, pure, unit, ($), (*>), (<#>), (<$), (<>), (=<<), (==), (>>=))
+import Prelude (class Show, type (~>), Unit, Void, const, pure, show, unit, ($), (*>), (<#>), (<$), (<>), (=<<), (==), (>>=))
 import Routing.Match (Match)
 import Routing.Match.Class (lit)
 import Simple.JSON (readImpl, readJSON')
@@ -46,6 +47,14 @@ data Location
   | Overhead
   | Admin
   | Login
+
+instance shLoc :: Show Location where
+  show = case _ of
+           Home         -> "Home"
+           Registration -> "Registration"
+           Overhead     -> "Overhead"
+           Admin        -> "Admin"
+           Login        -> "Login"
 
 locations :: Match Location
 locations
@@ -93,20 +102,22 @@ component =
 
     render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
     render state =
-      HH.div_
-        (( case state.flash of
-            Nothing -> []
-            Just  s -> [ HH.div_ [ HH.text s ] ]
-        ) <>
-        [ HH.ul_
-          [ HH.li_ [HH.a [HP.href "#registration"] [HH.text "Registration"]]
-          , HH.li_ [HH.a [HP.href "#overhead"]     [HH.text "Overhead"]]
-          , HH.li_ [HH.a [HP.href "#admin"]        [HH.text "Admin"]]
-          , loginlogoutlink state
-          , HH.li_ [HH.a [HP.href "#/"]            [HH.text "Home"]]
+      HH.div
+        [ HP.id_ (toLower (show state.currentLocation)) ]
+        [ HH.nav_
+          [ HH.menu_
+            [ HH.li_ [HH.a [HP.href "#/"]            [HH.text "Home"]]
+            , HH.li_ [HH.a [HP.href "#registration"] [HH.text "Registration"]]
+            , HH.li_ [HH.a [HP.href "#overhead"]     [HH.text "Overhead"]]
+            , HH.li_ [HH.a [HP.href "#admin"]        [HH.text "Admin"]]
+            , loginlogoutlink state
+            ]
           ]
-        , locationToSlot state.currentLocation state
-        ])
+        , HH.div
+          [HP.class_ (HH.ClassName "container")]
+          (maybe [] (\s -> [ HH.div_ [ HH.text s ] ]) state.flash
+          <> [locationToSlot state.currentLocation state])
+        ]
       where
         loginlogoutlink
           :: State
@@ -148,8 +159,10 @@ component =
     eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (LemmingPantsEffects e))
     eval =
       case _ of
-        ChangePage l next -> H.modify (_ {currentLocation = l}) *> pure next
-        SignOut      next -> H.liftAff removeToken *> pure next
+        ChangePage l next ->
+          H.modify (_ {currentLocation = l, flash = Nothing}) *> pure next
+        SignOut      next ->
+          H.liftAff removeToken *> pure next
         AdminMsg   m next ->
           case m of
             CA.Flash s -> flash s next

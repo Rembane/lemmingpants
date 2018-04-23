@@ -14,7 +14,7 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, id, map, pure, show, unit, (*>), (<>), (==), (>>=))
+import Prelude (type (~>), Unit, bind, const, id, map, pure, unit, (*>), (<>), (==), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
@@ -50,30 +50,31 @@ component =
       if pl.role == "admin_user"
         then
           HH.div_
-            ([ HH.h1_ [HH.text "The Secret Supreme Council Interface"]
-            , HH.h2_
+            ([ HH.h1
+              [HP.class_ (HH.ClassName "clearfix")]
               [ HH.button
-                [ HE.onClick (HE.input_ PreviousAI) ]
+                [ HE.onClick (HE.input_ PreviousAI), HP.id_ "prev-button" ]
                 [ HH.text "⇐" ]
-              , HH.text " "
               , HH.text (either id id (map (\(AgendaItem a) -> a.title) currentAI))
-              , HH.text " "
               , HH.button
-                [ HE.onClick (HE.input_ NextAI) ]
+                [ HE.onClick (HE.input_ NextAI), HP.id_ "next-button" ]
                 [ HH.text "⇒" ]
               ]
             ] <> either
                 (const [HH.text "No agenda item => no speaker queue."])
                 (\ai@(AgendaItem ai') ->
-                  let sqHeight = L.length ai'.speakerQueues in
-                  [ HH.p_ [ HH.text ("Speaker queue stack height: " <> show sqHeight) ]
-                  , case AG.topSQ ai of
+                  [ case AG.topSQ ai of
                       Nothing -> HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
                       Just sq ->
                         HH.slot
                           unit
                           SQ.component
-                          { speakerQueue: sq, token: state.token, attendees: state.attendees, agendaItemId: ai'.id, sqHeight }
+                          { speakerQueue: sq
+                          , token:        state.token
+                          , attendees:    state.attendees
+                          , agendaItemId: ai'.id
+                          , sqHeight:     L.length ai'.speakerQueues
+                          }
                           (HE.input SQMsg)
                   ])
                 currentAI
