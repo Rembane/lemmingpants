@@ -91,18 +91,18 @@ component =
                       , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
                       ])
                   sq.speakers))
-            , HH.slot
-              unit
-              (F.component "Add speaker"
-                [ mkField "id" "ID" [HP.type_ HP.InputNumber, HP.required true] ]
-              )
-              unit
-              (HE.input FormMsg)
             , HH.ul_
                 [ HH.li_ [ HH.button [ HE.onClick (HE.input_ Eject) ] [HH.text "Eject current speaker"] ]
                 , HH.li_ [ HH.button [ HE.onClick (HE.input_ Next)  ] [HH.text "Next speaker"] ]
                 ]
             ]
+            , HH.slot
+              unit
+              (F.component "Add speaker"
+                [ mkField "id" "Add a speaker to the queue by entering their speaker ID" [HP.type_ HP.InputNumber, HP.required true, HP.autocomplete false] ]
+              )
+              unit
+              (HE.input FormMsg)
         ]
       where
         (SpeakerQueue sq) = state.speakerQueue

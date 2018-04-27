@@ -50,18 +50,18 @@ component =
       if pl.role == "admin_user"
         then
           HH.div_
-            ([ HH.h1_ [HH.text "The Secret Supreme Council Interface"]
-            , HH.h2_
+            ([ HH.h1_
               [ HH.button
-                [ HE.onClick (HE.input_ PreviousAI) ]
+                [ HE.onClick (HE.input_ PreviousAI), HP.id_ "prev-button" ]
                 [ HH.text "⇐" ]
               , HH.text " "
               , HH.text (either id id (map (\(AgendaItem a) -> a.title) currentAI))
               , HH.text " "
               , HH.button
-                [ HE.onClick (HE.input_ NextAI) ]
+                [ HE.onClick (HE.input_ NextAI), HP.id_ "next-button" ]
                 [ HH.text "⇒" ]
               ]
+            , HH.div [HP.class_ (HH.ClassName "clearfix")] []
             ] <> either
                 (const [HH.text "No agenda item => no speaker queue."])
                 (\ai@(AgendaItem ai') ->
