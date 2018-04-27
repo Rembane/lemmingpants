@@ -16,5 +16,3 @@ GRANT admin_user TO lemmingpants;
 
 GRANT USAGE ON SCHEMA api TO admin_user;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA api TO admin_user;
-GRANT ALL ON ALL TABLES IN SCHEMA api TO admin_user;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA api TO admin_user;

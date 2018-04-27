@@ -14,6 +14,10 @@ GRANT SELECT ON agenda_item TO admin_user, web_anon;
 GRANT UPDATE ON agenda_item TO admin_user;
 GRANT REFERENCES ON agenda_item TO admin_user;
 
+GRANT INSERT ON agenda_item TO lemmingpants;
+GRANT ALL PRIVILEGES ON SEQUENCE agenda_item_id_seq TO lemmingpants;
+GRANT ALL PRIVILEGES ON SEQUENCE agenda_item_order__seq TO lemmingpants;
+
 -- Returns the id of the new current agenda item if things worked out well, 0 otherwise.
 CREATE FUNCTION set_current_agenda_item(id INTEGER) RETURNS INTEGER
     LANGUAGE plpgsql
