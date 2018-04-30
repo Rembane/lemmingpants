@@ -129,7 +129,7 @@ component =
             Registration -> go CP.cp1 1 CR.component rs   (HE.input RegistrationMsg)
             Overhead     -> go CP.cp2 2 CO.component ohs  (const Nothing)
             Admin        -> go CP.cp3 3 CA.component s'   (HE.input AdminMsg)
-            Login        -> go CP.cp4 4 CL.component unit (HE.input LoginMsg)
+            Login        -> go CP.cp4 4 CL.component rs   (HE.input LoginMsg)
             Home         -> go CP.cp5 5 CH.component unit (const Nothing)
           where
             go :: forall g i o
