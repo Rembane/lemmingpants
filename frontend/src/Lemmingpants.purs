@@ -159,8 +159,10 @@ component =
     eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (LemmingPantsEffects e))
     eval =
       case _ of
-        ChangePage l next -> H.modify (_ {currentLocation = l}) *> pure next
-        SignOut      next -> H.liftAff removeToken *> pure next
+        ChangePage l next ->
+          H.modify (_ {currentLocation = l, flash = Nothing}) *> pure next
+        SignOut      next ->
+          H.liftAff removeToken *> pure next
         AdminMsg   m next ->
           case m of
             CA.Flash s -> flash s next

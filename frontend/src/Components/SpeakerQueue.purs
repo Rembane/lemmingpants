@@ -74,35 +74,54 @@ component =
               [ HH.strong_ [ HH.text "Speaking: " ]
               , HH.text (maybe "–" (visualizeSpeaker state.attendees) sq.speaking)
               ]
-            , HH.table_
-                ([ HH.tr_
-                  [ HH.th_ [ HH.text "ID"]
-                  , HH.th_ [ HH.text "Name"]
-                  , HH.th_ [ HH.text "#Spoken"]
-                  , HH.th_ [ HH.text " "]
+            , HH.div
+              [ HP.id_ "speakerhandling-container" ]
+              [ HH.table
+                  [ HP.id_ "attendee-table" ]
+                  ([ HH.thead_
+                    [ HH.tr_
+                      [ HH.th
+                          [ HP.class_ (HH.ClassName "id") ]
+                          [ HH.text "ID"]
+                      , HH.th [ HP.id_ "name"      ] [ HH.text "Name"]
+                      , HH.th
+                          [ HP.class_ (HH.ClassName "numspoken")
+                          , HP.title ("Number of times spoken")
+                          ]
+                          [ HH.text "#"]
+                      , HH.th [ HP.id_ "delcol"    ] [ HH.text " "]
+                      ]
+                    ]
+                  ] <>
+                  (map
+                    (\s@(Speaker s') ->
+                      HH.tr_
+                        [ HH.td
+                          [ HP.class_ (HH.ClassName "id") ]
+                          [ HH.text (show s'.attendeeId) ]
+                        , HH.td_ [ HH.text (visualizeSpeaker state.attendees s) ]
+                        , HH.td
+                            [ HP.class_ (HH.ClassName "numspoken") ]
+                            [ HH.text (show s'.timesSpoken) ]
+                        , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
+                        ])
+                    sq.speakers))
+              , HH.div
+                  [ HP.id_ "button-col" ]
+                  [ HH.ul_
+                      [ HH.li_ [ HH.button [ HE.onClick (HE.input_ Eject) ] [HH.text "Eject current speaker"] ]
+                      , HH.li_ [ HH.button [ HE.onClick (HE.input_ Next)  ] [HH.text "Next speaker"] ]
+                      ]
+                  , HH.slot
+                      unit
+                      (F.component "Add speaker"
+                        [ mkField "id" "Speaker ID" [HP.type_ HP.InputNumber, HP.required true, HP.autocomplete false] ]
+                      )
+                      unit
+                      (HE.input FormMsg)
                   ]
-                ] <>
-                (map
-                  (\s@(Speaker s') ->
-                    HH.tr_
-                      [ HH.td_ [ HH.text (show s'.attendeeId) ]
-                      , HH.td_ [ HH.text (visualizeSpeaker state.attendees s) ]
-                      , HH.td_ [ HH.text (show s'.timesSpoken) ]
-                      , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
-                      ])
-                  sq.speakers))
-            , HH.ul_
-                [ HH.li_ [ HH.button [ HE.onClick (HE.input_ Eject) ] [HH.text "Eject current speaker"] ]
-                , HH.li_ [ HH.button [ HE.onClick (HE.input_ Next)  ] [HH.text "Next speaker"] ]
-                ]
-            ]
-            , HH.slot
-              unit
-              (F.component "Add speaker"
-                [ mkField "id" "Add a speaker to the queue by entering their speaker ID" [HP.type_ HP.InputNumber, HP.required true, HP.autocomplete false] ]
-              )
-              unit
-              (HE.input FormMsg)
+              ]
+          ]
         ]
       where
         (SpeakerQueue sq) = state.speakerQueue

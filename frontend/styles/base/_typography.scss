@@ -19,17 +19,15 @@ h6 {
 
 /* BEGIN headers.
    Lets make this more fancy.
+
+   We only have proper support for three levels of headings.
+   I believe that's enough. If you need more, you're welcome
+   to change stuff around below.
  */
 
-h1 { font-size: modular-scale(6, 1em, .167); }
-/*
-h2 { font-size: modular-scale(5); }
-h3 { font-size: modular-scale(4); }
-h4 { font-size: modular-scale(3); }
-h5 { font-size: modular-scale(2); }
-h6 { font-size: modular-scale(1); }
-*/
-
+h1 { font-size: modular-scale(3); }
+h2 { font-size: modular-scale(2); }
+h3 { font-size: modular-scale(1); }
 
 /* END headers */
 

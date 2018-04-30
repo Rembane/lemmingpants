@@ -54,9 +54,7 @@ component =
               [ HH.button
                 [ HE.onClick (HE.input_ PreviousAI), HP.id_ "prev-button" ]
                 [ HH.text "⇐" ]
-              , HH.text " "
               , HH.text (either id id (map (\(AgendaItem a) -> a.title) currentAI))
-              , HH.text " "
               , HH.button
                 [ HE.onClick (HE.input_ NextAI), HP.id_ "next-button" ]
                 [ HH.text "⇒" ]

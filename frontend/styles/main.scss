@@ -1,6 +1,12 @@
+@import "includes/normalize";
 @import "neat/neat";
 @import "bourbon/bourbon";
 @import "base/base";
+
+$neat-grid: (
+  columns: 12,
+  gutter: 20px
+);
 
 body {
   margin: 0 0 ($base-spacing * 2);
@@ -38,8 +44,21 @@ nav {
 
 /* Overhead */
 #overhead {
+  @include margin(3em null);
+
   nav {
     display: none;
+  }
+
+  h1#with-ruler {
+    border-bottom: $base-border;
+  }
+
+  ol {
+    list-style-type: decimal;
+    list-style-position: inside;
+    margin-left: 3em;
+    padding: 0;
   }
 }
 
@@ -56,9 +75,41 @@ nav {
   #next-button {
     float: right;
   }
+
+  #speakerhandling-container {
+    @include grid-container;
+  }
+
+  #attendee-table {
+    @include grid-column(8);
+
+    .id {
+      width: 3ch;
+      text-align: right;
+    }
+
+    .numspoken {
+      width: 3ch;
+      text-align: right;
+    }
+
+    #delcol {
+      width: 5em;
+    }
+  }
+
+  #button-col {
+    @include grid-column(4);
+    margin: $base-spacing 0;
+
+    button {
+      margin-bottom: 0.25em;
+      width: 100%;
+    }
+  }
 }
 
 /* Utils */
 .clearfix {
-  clear: both;
+  @include clearfix;
 }
