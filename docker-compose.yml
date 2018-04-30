@@ -3,13 +3,14 @@ services:
   lemmingpants-frontend:
     image: lemmingpants-frontend:latest
     container_name: lemmingpants-frontend
-    ports:
-      - "8000:80"
     depends_on:
       - db
       - ws
       - lemmingpants
+    volumes:
+      - ./static/:/static/
 
+  # Postgrest
   lemmingpants:
     image: lemmingpants-backend:latest
     container_name: lemmingpants
@@ -19,7 +20,7 @@ services:
       - db
 
   db:
-    image: postgres:9.6
+    image: lemmingpants-db:latest
     container_name: db
     ports:
       - "5432:5432"
@@ -38,7 +39,10 @@ services:
       PGWS_DB_URI: postgres://lemmingpants:lemmingpants@db/lemmingpants
       PGWS_JWT_SECRET: "feBU1ykZ4icKs2nKam9l8CD84qhgeOl6QQakrUJBiRTUu4dKTLVoH8o"
     ports:
-        - "3001:3000"
+        - "8000:8000"
     depends_on:
       - lemmingpants
       - db
+    volumes:
+      - ./docker/websockets.conf:/etc/postgres-websockets.conf
+      - ./static/:/static/

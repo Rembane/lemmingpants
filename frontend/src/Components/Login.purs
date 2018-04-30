@@ -7,6 +7,7 @@ import Data.Array as A
 import Data.Either (Either(..), note)
 import Data.Foldable (foldMap)
 import Data.Foreign (Foreign, ForeignError(..), MultipleErrors, renderForeignError)
+import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(Nothing))
 import Effects (LemmingPantsEffects)
 import Halogen as H
@@ -16,11 +17,11 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax as AX
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, discard, pure, unit, ($), (*>), (<<<), (>>=))
+import Prelude (type (~>), Unit, bind, const, discard, id, pure, unit, ($), (*>), (<<<), (>>=))
 import Simple.JSON (read)
 import Types.Token (Token, parseToken)
 
-type State = Unit
+type State = { token :: Token }
 
 data Query a
   = FormMsg F.Message a
@@ -30,10 +31,10 @@ data Message
   | Flash    String
 
 
-component :: forall e. H.Component HH.HTML Query Unit Message (Aff (LemmingPantsEffects e))
+component :: forall e. H.Component HH.HTML Query State Message (Aff (LemmingPantsEffects e))
 component =
   H.parentComponent
-    { initialState: const unit
+    { initialState: id
     , render
     , eval
     , receiver: const Nothing
@@ -60,7 +61,12 @@ component =
         FormMsg m next ->
           case m of
             F.FormSubmitted m' -> do
-              r <- H.liftAff $ PG.post (createURL "/rpc/login") m'
+              -- You can use signedInAjax even if you're not signed in.
+              -- It just needs a token, and everybody gets a token upon
+              -- loading the page so they can connect to the websocket
+              -- server.
+              token <- H.gets (\s -> s.token)
+              r <- H.liftAff $ PG.signedInAjax (createURL "/rpc/login") token POST [] m'
               case result r of
                 Left  es -> H.raise $ Flash $ foldMap renderForeignError es
                 Right t  -> (H.raise $ NewToken t)

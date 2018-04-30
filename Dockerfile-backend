@@ -1,22 +1,11 @@
 FROM debian:stretch
 RUN apt-get update && apt-get install -y \
-        curl \
-        git \
         postgresql-server-dev-9.6  \
-        make
+        curl
 
-RUN mkdir -p /setup
-#pgjwt needs postgresql-server-dev-9.6, probably.
-RUN git clone https://github.com/michelp/pgjwt /setup/pgwjt
-WORKDIR /setup/pgwjt
-RUN make install
-
-WORKDIR /setup/
-RUN curl -sSL https://get.haskellstack.org/ | sh
 # Host this on dtek maybe, I had issues getting it from github and so I put it here.
 RUN curl https://davebay.net/files/postgrest -o /usr/local/bin/postgrest
 RUN chmod +x /usr/local/bin/postgrest
-RUN rm -rf /setup
 
 RUN mkdir -p /srv/lemmingpants
 ADD ./ /srv/lemmingpants

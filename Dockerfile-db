@@ -1,0 +1,13 @@
+FROM postgres:9.6
+RUN apt-get update && apt-get install -y \
+        curl \
+        git \
+        postgresql-server-dev-9.6  \
+        make
+
+RUN mkdir -p /setup
+#pgjwt needs postgresql-server-dev-9.6, probably.
+RUN git clone https://github.com/michelp/pgjwt /setup/pgwjt
+WORKDIR /setup/pgwjt
+RUN make install
+RUN rm -rf /setup

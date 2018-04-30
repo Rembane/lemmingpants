@@ -1,4 +1,4 @@
-FROM nginx:latest
+FROM debian:stretch
 RUN apt-get update && apt-get install -y curl gnupg2 git make
 
 RUN curl -sL https://deb.nodesource.com/setup_8.x | bash -
@@ -12,10 +12,9 @@ RUN yarn global add bower
 
 RUN mkdir -p /srv/lemmingpants
 ADD ./frontend /srv/lemmingpants
+RUN mkdir -p /srv/static
+ADD ./static /srv/static
 WORKDIR /srv/lemmingpants
 RUN bower install --allow-root
 RUN make compile
-RUN mv /srv/lemmingpants/main.js /usr/share/nginx/html/main.js
-ADD ./static/index.html /usr/share/nginx/html/index.html
-
-CMD ["nginx", "-g", "daemon off;"]
+RUN mv main.js /srv/static

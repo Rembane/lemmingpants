@@ -1,7 +1,6 @@
 module Postgrest
   ( createURL
   , createWSURL
-  , post
   , signedInAjax
   , useToken
   , emptyResponse
@@ -22,7 +21,7 @@ import Network.HTTP.Affjax (AJAX)
 import Network.HTTP.Affjax as AX
 import Network.HTTP.Affjax.Response (class Respondable)
 import Network.HTTP.RequestHeader (RequestHeader(..))
-import Prelude (pure, (<#>), (<>), (>>=), (>>>))
+import Prelude (Unit, pure, (<#>), (<>), (>>=), (>>>))
 import Simple.JSON (class WriteForeign, read, writeJSON)
 import Types.Token (Token(..), parseToken)
 
@@ -36,26 +35,14 @@ createWSURL :: String -> String
 createWSURL = (wsUrlPrefix <> _)
 
 pgrequest
-  :: forall d
-   . WriteForeign d
-   => String
-   -> d
-   -> AX.AffjaxRequest String
-pgrequest url d = AX.defaultRequest
-  { url     = url
-  , headers =
-      AX.defaultRequest.headers <> [ ContentType (MediaType "application/json") ]
-  , content = Just (writeJSON d)
-  }
-
-post
-  :: forall a d e
-   . Respondable a
-  => WriteForeign d
-  => String
-  -> d
-  -> Aff (ajax :: AJAX | e) (AX.AffjaxResponse a)
-post url d = AX.affjax ((pgrequest url d) { method = Left POST })
+  :: String
+  -> AX.AffjaxRequest Unit
+pgrequest url =
+  AX.defaultRequest
+    { url     = url
+    , headers =
+        AX.defaultRequest.headers <> [ ContentType (MediaType "application/json") ]
+    }
 
 useToken
   :: Token
@@ -73,7 +60,7 @@ signedInAjax
   -> d
   -> Aff (ajax :: AJAX | e) (AX.AffjaxResponse a)
 signedInAjax url token m hs d =
-  let pg' = pgrequest url d
+  let pg' = (pgrequest url) { content = Just (writeJSON d) }
    in AX.affjax (pg' { headers = pg'.headers <> [useToken token] <> hs, method = Left m })
 
 emptyResponse
@@ -89,7 +76,7 @@ emptyResponse url token m d = signedInAjax url token m mempty d
 -- | Request a new, anonymous token
 requestAnonymousToken :: forall e. Aff (ajax :: AJAX | e) (Either MultipleErrors Token)
 requestAnonymousToken =
-  post (createURL "/rpc/get_token") ""
+  AX.affjax (pgrequest (createURL "/rpc/get_token")) { method = Left POST }
   <#> \{response} ->
     pt response
     >>= (A.head
