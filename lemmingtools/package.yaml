@@ -23,8 +23,8 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-      - megaparsec == 6.4.1
-      - text == 1.2.3.0
+      - megaparsec >= 6.3.0 && <= 6.4.1
+      - text >= 1.2.2.2 && <= 1.2.3.0
       - bytestring == 0.10.8.2
       - postgresql-simple == 0.5.3.0
 

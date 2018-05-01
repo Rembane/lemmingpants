@@ -7,8 +7,6 @@ module Lib
   , punktToSQL
   ) where
 
--- | So many parsers, so little time... ---------------------------------------
-
 import Data.Functor
 import Data.Maybe
 import Data.Monoid
