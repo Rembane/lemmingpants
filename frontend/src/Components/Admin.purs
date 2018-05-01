@@ -14,10 +14,11 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, id, map, pure, unit, (*>), (<>), (==), (>>=))
+import Prelude (type (~>), Unit, bind, const, id, map, pure, unit, ($), (*>), (<>), (==), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
+import Types.Flash as FL
 import Types.Token (Payload(..), Token(..))
 
 type State =
@@ -34,7 +35,7 @@ data Query a
   | GotNewState State a
 
 data Message
-  = Flash String
+  = Flash FL.Flash
 
 component :: forall e. H.Component HH.HTML Query Input Message (Aff (LemmingPantsEffects e))
 component =
@@ -119,7 +120,7 @@ component =
     setCurrentAgendaItem mai =
       case mai of
         Left s ->
-          H.raise (Flash s)
+          H.raise $ Flash $ FL.mkFlash s FL.Error
         Right (AgendaItem c) -> do
           s <- H.get
           r <- H.liftAff (PG.emptyResponse
@@ -131,4 +132,8 @@ component =
             StatusCode 200 ->
               pure unit
             _ ->
-              H.raise (Flash "setCurrentAgendaItem -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+              H.raise $ Flash $
+                FL.mkFlash
+                  "setCurrentAgendaItem -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+                  FL.Error
+

@@ -19,6 +19,7 @@ import Postgrest (createURL)
 import Postgrest as PG
 import Prelude (type (~>), Unit, bind, const, discard, id, pure, unit, ($), (*>), (<<<), (>>=))
 import Simple.JSON (read)
+import Types.Flash as FL
 import Types.Token (Token, parseToken)
 
 type State = { token :: Token }
@@ -28,7 +29,7 @@ data Query a
 
 data Message
   = NewToken Token
-  | Flash    String
+  | Flash    FL.Flash
 
 
 component :: forall e. H.Component HH.HTML Query State Message (Aff (LemmingPantsEffects e))
@@ -68,9 +69,9 @@ component =
               token <- H.gets (\s -> s.token)
               r <- H.liftAff $ PG.signedInAjax (createURL "/rpc/login") token POST [] m'
               case result r of
-                Left  es -> H.raise $ Flash $ foldMap renderForeignError es
+                Left  es -> H.raise $ Flash $ FL.mkFlash (foldMap renderForeignError es) FL.Error
                 Right t  -> (H.raise $ NewToken t)
-                           *> (H.raise $ Flash "You are now logged in!")
+                           *> (H.raise $ Flash $ FL.mkFlash "You are now logged in!" FL.Info)
               pure next
 
       where

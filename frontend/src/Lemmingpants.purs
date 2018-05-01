@@ -30,6 +30,7 @@ import Simple.JSON (readImpl, readJSON')
 import Types.Agenda (Agenda, AgendaItem(AgendaItem))
 import Types.Agenda as AG
 import Types.Attendee (Attendee, AttendeeDB, insertAttendee)
+import Types.Flash as FL
 import Types.Speaker (Speaker(..))
 import Types.SpeakerQueue (SpeakerQueue(..), addSpeaker, modifySpeaker)
 import Types.Token (Payload(..), Token(..), removeToken, saveToken)
@@ -67,9 +68,10 @@ locations
 type State =
   { currentLocation :: Location
   , token           :: Token
-  , flash           :: Maybe String
+  , flash           :: Maybe FL.Flash
   , agenda          :: Agenda
   , attendees       :: AttendeeDB
+  , showRegForm     :: Boolean
   }
 
 data Query a
@@ -98,6 +100,7 @@ component =
       , flash:           Nothing
       , agenda:          i.agenda
       , attendees:       i.attendees
+      , showRegForm:     true
       }
 
     render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
@@ -115,8 +118,8 @@ component =
           ]
         , HH.div
           [HP.class_ (HH.ClassName "container")]
-          (maybe [] (\s -> [ HH.div_ [ HH.text s ] ]) state.flash
-          <> [locationToSlot state.currentLocation state])
+          (maybe [] (\(FL.Flash f) -> [ HH.div [ HP.id_ "flash", (HP.class_ (HH.ClassName (show f.typ))) ] [ HH.text f.msg ] ]) state.flash
+            <> [locationToSlot state.currentLocation state])
         ]
       where
         loginlogoutlink
@@ -140,7 +143,7 @@ component =
             Registration -> go CP.cp1 1 CR.component rs   (HE.input RegistrationMsg)
             Overhead     -> go CP.cp2 2 CO.component ohs  (const Nothing)
             Admin        -> go CP.cp3 3 CA.component s'   (HE.input AdminMsg)
-            Login        -> go CP.cp4 4 CL.component rs   (HE.input LoginMsg)
+            Login        -> go CP.cp4 4 CL.component ls   (HE.input LoginMsg)
             Home         -> go CP.cp5 5 CH.component unit (const Nothing)
           where
             go :: forall g i o
@@ -152,7 +155,8 @@ component =
             -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
             go cp p c i f = HH.slot' cp p c i f
 
-            rs  = { token: s.token }
+            ls  = { token: s.token }
+            rs  = { token: s.token, showForm: s.showRegForm }
             s'  = { token: s.token, agenda: s.agenda, attendees: s.attendees }
             ohs = { agenda: s.agenda, attendees: s.attendees }
 
@@ -160,7 +164,7 @@ component =
     eval =
       case _ of
         ChangePage l next ->
-          H.modify (_ {currentLocation = l, flash = Nothing}) *> pure next
+          H.modify (_ {currentLocation = l, flash = Nothing, showRegForm = true}) *> pure next
         SignOut      next ->
           H.liftAff removeToken *> pure next
         AdminMsg   m next ->
@@ -175,12 +179,13 @@ component =
             CL.Flash s -> flash s next
         RegistrationMsg m next ->
           case m of
-            CR.Flash s -> flash s next
+            CR.FrmVsbl b -> H.modify (\s -> s { showRegForm = b }) *> pure next
+            CR.Flash   s -> flash s next
         WSMsg s next ->
           H.liftAff (log s)
           *> H.get >>= (\state ->
           case runExcept (dispatcher state =<< readJSON' s) of
-            Left  es -> flash (foldMap renderForeignError es) next
+            Left  es -> flash (FL.mkFlash (foldMap renderForeignError es) FL.Error) next
             Right s' -> H.put s' *> pure next
           )
       where

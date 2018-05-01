@@ -22,6 +22,7 @@ import Postgrest as PG
 import Prelude (type (~>), Unit, bind, id, map, pure, show, unit, ($), (*>), (<=), (<>))
 import Simple.JSON (readJSON)
 import Types.Attendee (Attendee(..), AttendeeDB, getAttendeeByNumber)
+import Types.Flash as FL
 import Types.Speaker (Speaker(..), visualizeSpeaker)
 import Types.SpeakerQueue (SpeakerQueue(..))
 import Types.Token (Token)
@@ -44,7 +45,7 @@ data Query a
   | GotNewState State     a
 
 data Message
-  = Flash String
+  = Flash FL.Flash
 
 component :: forall e. H.Component HH.HTML Query State Message (Aff (LemmingPantsEffects e))
 component =
@@ -144,7 +145,7 @@ component =
             StatusCode 201 -> -- The `Created` HTTP status code.
               pure unit
             _ ->
-              H.raise (Flash "PushSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+              H.raise $ Flash $ FL.mkFlash "PushSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
           *> pure next
         PopSQ next -> do
           state <- H.get
@@ -158,7 +159,7 @@ component =
             StatusCode 204 -> -- No Content
               pure unit
             _ ->
-              H.raise (Flash "PopSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+              H.raise $ Flash $ FL.mkFlash "PopSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
           *> pure next
         FormMsg m next -> do
           state <- H.get
@@ -170,7 +171,7 @@ component =
                 Right n -> do
                   case getAttendeeByNumber n state.attendees of
                     Nothing           ->
-                      H.raise (Flash ("Couldn't find attendee with number: " <> show n))
+                      H.raise $ Flash $ FL.mkFlash ("Couldn't find attendee with number: " <> show n) FL.Error
                     Just (Attendee a) -> do
                       r <- H.liftAff $ PG.emptyResponse
                         (createURL "/speaker")
@@ -183,9 +184,9 @@ component =
                         StatusCode 201 -> -- The `Created` HTTP status code.
                           pure unit
                         StatusCode 409 -> -- We can only have a visible speaker once per speaker queue.
-                          H.raise (Flash "I'm sorry, but you cannot add a speaker while it still is in the speaker queue.")
+                          H.raise $ Flash $ FL.mkFlash "I'm sorry, but you cannot add a speaker while it still is in the speaker queue." FL.Error
                         _ ->
-                          H.raise (Flash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+                          H.raise $ Flash $ FL.mkFlash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
           *> pure next
         Next next -> do
           state <- H.get
@@ -202,7 +203,7 @@ component =
                 StatusCode 200 ->
                   pure unit
                 _ ->
-                  H.raise (Flash "SpeakerQueue.Next -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+                  H.raise $ Flash $ FL.mkFlash "SpeakerQueue.Next -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
           *> pure next
         Eject next -> do
           state <- H.get
@@ -219,7 +220,7 @@ component =
                 StatusCode 204 -> -- The `Created` HTTP status code.
                   pure unit
                 _ ->
-                  H.raise (Flash "SpeakerQueue.Eject -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+                  H.raise $ Flash $ FL.mkFlash "SpeakerQueue.Eject -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
           *> pure next
         Delete id_ next -> do
           state <- H.get
@@ -232,6 +233,6 @@ component =
             StatusCode 204 -> -- The `Created` HTTP status code.
               pure unit
             _ ->
-              H.raise (Flash "SpeakerQueue.Delete -- ERROR! Got a HTTP response we didn't expect! See the console for more information.")
+              H.raise $ Flash $ FL.mkFlash "SpeakerQueue.Delete -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
           *> pure next
         GotNewState s next -> H.put s *> pure next

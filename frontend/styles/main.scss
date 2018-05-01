@@ -42,6 +42,24 @@ nav {
   }
 }
 
+#flash {
+  padding: 1em;
+  margin-bottom: 1em;
+  font-weight: bolder;
+}
+
+/* Flash! */
+#flash.error {
+  color: $error-fg;
+  background-color: $error-bg;
+}
+
+#flash.info {
+  color: $info-fg;
+  background-color: $info-bg;
+  border: 5px solid $info-fg;
+}
+
 /* Overhead */
 #overhead {
   @include margin(3em null);

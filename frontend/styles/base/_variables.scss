@@ -21,6 +21,8 @@ $light-gray: #ddd;
 // Font Colors
 $base-font-color: $dark-gray;
 $action-color: $blue;
+$error-fg: #fff;
+$info-fg: $action-color;
 
 // Border
 $base-border-color: $light-gray;
@@ -28,6 +30,8 @@ $base-border: 1px solid $base-border-color;
 
 // Background Colors
 $viewport-background-color: #fff;
+$error-bg: #f00;
+$info-bg: #fff;
 
 // Focus
 $focus-outline-color: transparentize($action-color, 0.4);
