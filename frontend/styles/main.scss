@@ -1,0 +1,122 @@
+@import "includes/normalize";
+@import "neat/neat";
+@import "bourbon/bourbon";
+@import "base/base";
+
+$neat-grid: (
+  columns: 12,
+  gutter: 20px
+);
+
+body {
+  margin: 0 0 ($base-spacing * 2);
+}
+
+.container {
+  @include margin(null auto);
+  @include padding(null $base-spacing);
+  max-width: 720px;
+}
+
+/* Menu */
+nav {
+  background-color: #333;
+  menu {
+    @include margin(null auto 1em auto);
+    @include padding(0.5em $base-spacing);
+    max-width: 720px;
+
+    li {
+      display: inline-block;
+      margin-left: 1em;
+
+      &:first-child {
+        margin-left: 0;
+      }
+      a {
+        text-decoration: none;
+        font-weight: bold;
+        color: #fff;
+      }
+    }
+  }
+}
+
+/* Overhead */
+#overhead {
+  @include margin(3em null);
+
+  nav {
+    display: none;
+  }
+
+  h1#with-ruler {
+    border-bottom: $base-border;
+  }
+
+  ol {
+    list-style-type: decimal;
+    list-style-position: inside;
+    margin-left: 3em;
+    padding: 0;
+  }
+}
+
+/* Admin */
+#admin {
+  h1, h2 {
+    text-align: center;
+  }
+
+  #prev-button {
+    float: left;
+  }
+
+  #next-button {
+    float: right;
+  }
+
+  #speakerhandling-container {
+    @include grid-container;
+    @include grid-collapse;
+  }
+
+  #speaker-col {
+    @include grid-column(8);
+
+    #attendee-table {
+      .id {
+        width: 3ch;
+        text-align: right;
+      }
+
+      .numspoken {
+        width: 3ch;
+        text-align: right;
+      }
+
+      #delcol {
+        width: 5em;
+      }
+    }
+  }
+
+  #speaker-button-col {
+    @include grid-column(4);
+    @include margin($base-spacing null);
+
+    form, .with-top-margin {
+      margin-top: 3em;
+    }
+
+    #{$all-buttons} {
+      margin-bottom: 0.25em;
+      width: 100%;
+    }
+  }
+}
+
+/* Utils */
+.clearfix {
+  @include clearfix;
+}

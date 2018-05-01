@@ -58,50 +58,72 @@ component =
   where
     render :: State -> H.ParentHTML Query F.Query Unit (Aff (LemmingPantsEffects e))
     render state =
-      HH.div_
-        [ HH.div_
-          [ HH.button [ HE.onClick (HE.input_ PushSQ) ] [ HH.text "Push speakerqueue" ]
-          , HH.button
-            [ HE.onClick (HE.input_ PopSQ)
-            , if state.sqHeight <= 1
-                then HP.disabled true
-                else HP.disabled false
+      HH.div
+        [ HP.id_ "speakerhandling-container" ]
+        [ HH.div
+          [ HP.id_ "speaker-col" ]
+          [ HH.p_
+            [ HH.strong_ [ HH.text "Speaking: " ]
+            , HH.text (maybe "–" (visualizeSpeaker state.attendees) sq.speaking)
             ]
-            [ HH.text "Pop speakerqueue" ]
-          ]
-        , HH.div_
-            [ HH.p_
-              [ HH.strong_ [ HH.text "Speaking: " ]
-              , HH.text (maybe "–" (visualizeSpeaker state.attendees) sq.speaking)
-              ]
-            , HH.table_
-                ([ HH.tr_
-                  [ HH.th_ [ HH.text "ID"]
-                  , HH.th_ [ HH.text "Name"]
-                  , HH.th_ [ HH.text "#Spoken"]
-                  , HH.th_ [ HH.text " "]
+          , HH.table
+              [ HP.id_ "attendee-table" ]
+              ([ HH.thead_
+                [ HH.tr_
+                  [ HH.th
+                      [ HP.class_ (HH.ClassName "id") ]
+                      [ HH.text "ID"]
+                  , HH.th [ HP.id_ "name"      ] [ HH.text "Name"]
+                  , HH.th
+                      [ HP.class_ (HH.ClassName "numspoken")
+                      , HP.title ("Number of times spoken")
+                      ]
+                      [ HH.text "#"]
+                  , HH.th [ HP.id_ "delcol"    ] [ HH.text " "]
                   ]
-                ] <>
-                (map
-                  (\s@(Speaker s') ->
-                    HH.tr_
-                      [ HH.td_ [ HH.text (show s'.attendeeId) ]
-                      , HH.td_ [ HH.text (visualizeSpeaker state.attendees s) ]
-                      , HH.td_ [ HH.text (show s'.timesSpoken) ]
-                      , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
-                      ])
-                  sq.speakers))
-            , HH.slot
-              unit
-              (F.component "Add speaker"
-                [ mkField "id" "ID" [HP.type_ HP.InputNumber, HP.required true] ]
-              )
-              unit
-              (HE.input FormMsg)
-            , HH.ul_
-                [ HH.li_ [ HH.button [ HE.onClick (HE.input_ Eject) ] [HH.text "Eject current speaker"] ]
-                , HH.li_ [ HH.button [ HE.onClick (HE.input_ Next)  ] [HH.text "Next speaker"] ]
                 ]
+              ] <>
+              (map
+                (\s@(Speaker s') ->
+                  HH.tr_
+                    [ HH.td
+                      [ HP.class_ (HH.ClassName "id") ]
+                      [ HH.text (show s'.attendeeId) ]
+                    , HH.td_ [ HH.text (visualizeSpeaker state.attendees s) ]
+                    , HH.td
+                        [ HP.class_ (HH.ClassName "numspoken") ]
+                        [ HH.text (show s'.timesSpoken) ]
+                    , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
+                    ])
+                sq.speakers))
+          ]
+        , HH.div
+            [ HP.id_ "speaker-button-col" ]
+            [ HH.p_ [ HH.text ("Stack height: " <> show state.sqHeight) ]
+            , HH.ul_
+              [ HH.li_ [ HH.button [ HE.onClick (HE.input_ PushSQ) ] [ HH.text "Push speakerqueue" ] ]
+              , HH.li_
+                [ HH.button
+                  [ HE.onClick (HE.input_ PopSQ)
+                  , if state.sqHeight <= 1
+                      then HP.disabled true
+                      else HP.disabled false
+                  ]
+                  [ HH.text "Pop speakerqueue" ]
+                ]
+              ]
+            , HH.ul
+              [ HP.class_ (HH.ClassName "with-top-margin") ]
+              [ HH.li_ [ HH.button [ HE.onClick (HE.input_ Eject) ] [HH.text "Eject current speaker"] ]
+              , HH.li_ [ HH.button [ HE.onClick (HE.input_ Next)  ] [HH.text "Next speaker"] ]
+              ]
+            , HH.slot
+                unit
+                (F.component "Add speaker"
+                  [ mkField "id" "Speaker ID" [HP.type_ HP.InputNumber, HP.required true, HP.autocomplete false] ]
+                )
+                unit
+                (HE.input FormMsg)
             ]
         ]
       where

@@ -8,3 +8,4 @@ bundle.js*
 frontend/output/*
 frontend/main.js
 static/main.js
+static/bundle.css
