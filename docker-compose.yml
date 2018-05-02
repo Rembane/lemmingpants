@@ -1,4 +1,6 @@
 version: '3'
+volumes:
+  static:
 services:
   lemmingpants-frontend:
     image: lemmingpants-frontend:latest
@@ -8,7 +10,7 @@ services:
       - ws
       - lemmingpants
     volumes:
-      - ./static/:/static/
+      - static:/srv/static/
 
   # Postgrest
   lemmingpants:
@@ -45,4 +47,4 @@ services:
       - db
     volumes:
       - ./docker/websockets.conf:/etc/postgres-websockets.conf
-      - ./static/:/static/
+      - static:/static/
