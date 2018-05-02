@@ -1,4 +1,5 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "default", doBenchmark ? false }:
+{ nixpkgs ? import <nixpkgs> {}, compiler ? "default" }:
+with nixpkgs.haskell.lib;
 
 let
 
@@ -26,12 +27,13 @@ let
       };
 
   haskellPackages = if compiler == "default"
-                       then pkgs.haskellPackages
+                       then pkgs.haskell.packages.ghc822
                        else pkgs.haskell.packages.${compiler};
 
-  variant = if doBenchmark then pkgs.haskell.lib.doBenchmark else pkgs.lib.id;
+  parser-combinators = haskellPackages.callPackage ./nix-support/parser-combinators-0.4.0.nix {};
+  megaparsec = dontCheck (haskellPackages.callPackage ./nix-support/megaparsec-6.4.1.nix { parser-combinators = parser-combinators; });
 
-  drv = variant (haskellPackages.callPackage f {});
+  drv = haskellPackages.callPackage f { megaparsec = megaparsec; };
 
 in
 
