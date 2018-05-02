@@ -40,9 +40,9 @@ executables:
         - bytestring
         - lemmingtools
         - megaparsec
+        - optparse-applicative == 0.14.2.0
         - postgresql-simple
         - text
-# - optparse-applicative == 0.14.2.0 This will be needed eventually.
 
 tests:
   lemmingtools-test:
