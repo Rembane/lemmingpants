@@ -22,7 +22,6 @@ body {
 
 /* Menu */
 nav {
-  background-color: #333;
   menu {
     @include margin(null auto 1em auto);
     @include padding(0.5em $base-spacing);
