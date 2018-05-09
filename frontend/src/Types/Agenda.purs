@@ -21,6 +21,7 @@ import Types.SpeakerQueue
 import Control.Alternative ((<|>))
 import Data.Array as A
 import Data.Either (Either, note)
+import Data.Lens (Lens', lens)
 import Data.List as L
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.Newtype (class Newtype)
@@ -100,6 +101,10 @@ instance rfAg :: ReadForeign Agenda where
   readImpl fr =
     readImpl fr
       <#> Agenda 0
+
+-- | How to get insight into the agenda.
+_AgendaItems :: Lens' Agenda (Array AgendaItem)
+_AgendaItems = lens (\(Agenda _ items) -> items) (\(Agenda i _) items -> Agenda i items)
 
 currIdx :: Agenda -> Int
 currIdx (Agenda i _) = i

@@ -1,4 +1,7 @@
-module Types.Speaker where
+module Types.Speaker
+  ( Speaker(..)
+  , visualizeSpeaker
+  ) where
 
 import Data.Maybe (maybe)
 import Data.Newtype (class Newtype)
