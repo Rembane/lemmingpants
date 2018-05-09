@@ -1,17 +1,16 @@
 module Types.Agenda
   ( AgendaItem(..)
   , Agenda
+  , _AgendaItems
+  , _CurrentAgendaItem
+  , _SpeakerQueues
   , topSQ
   , pushSQ
   , popSQIfMatchingId
-  , modifySQ
-  , currIdx
-  , curr
   , next
   , prev
   , empty
   , insert
-  , modify
   , jumpToFirstActive
   , getCurrentAI
   ) where
@@ -21,14 +20,17 @@ import Types.SpeakerQueue
 import Control.Alternative ((<|>))
 import Data.Array as A
 import Data.Either (Either, note)
+import Data.Lens (Lens', element, lens, over, preview, traverseOf, traversed)
 import Data.List as L
-import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
+import Data.Maybe (Maybe, fromJust, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Record as R
 import Data.Record.ShowRecord (showRecord)
-import Prelude (class Eq, class Ord, class Show, compare, eq, (+), (-), (/=), (<), (<#>), (<<<), (<>), (==), (>=), (>>=), (>>>))
+import Partial.Unsafe (unsafePartial)
+import Prelude (class Eq, class Ord, class Show, compare, const, ($), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>>>))
 import Simple.JSON (class ReadForeign, readImpl)
 import Type.Prelude (SProxy(..))
+import Types.Lens (_withId)
 
 ------------------------------------------------------------------------------
 -- | AgendaItem
@@ -62,34 +64,25 @@ instance rfAI :: ReadForeign AgendaItem where
             (L.sort <<< (L.fromFoldable :: Array SpeakerQueue -> L.List SpeakerQueue))
       >>> AgendaItem
 
--- The top of the speaker queue stack
+_SpeakerQueues :: Lens' AgendaItem (L.List SpeakerQueue)
+_SpeakerQueues
+  = lens
+      (\(AgendaItem a)    -> a.speakerQueues)
+      (\(AgendaItem a) ss -> AgendaItem a { speakerQueues = ss })
+
+-- | The top of the speaker queue stack.
 topSQ :: AgendaItem -> Maybe SpeakerQueue
-topSQ (AgendaItem a) = L.head a.speakerQueues
+topSQ = preview (_SpeakerQueues <<< traversed)
 
+-- | Push a speakerqueue onto the top of the stack.
 pushSQ :: SpeakerQueue -> AgendaItem -> AgendaItem
-pushSQ sq (AgendaItem ai) = AgendaItem (ai { speakerQueues = L.Cons sq ai.speakerQueues })
+pushSQ sq = over _SpeakerQueues (L.Cons sq)
 
--- | If the ids match, pop the speakerQueue, otherwise, noop.
+-- | If the ids match, pop the speakerQueue and return Just the new AgendaItem, otherwise, noop.
 popSQIfMatchingId :: Int -> AgendaItem -> Maybe AgendaItem
-popSQIfMatchingId id (AgendaItem ai) =
-  case L.uncons ai.speakerQueues of
-    Nothing           -> Nothing
-    Just {head, tail} -> let (SpeakerQueue sq) = head
-                          in if sq.id == id
-                               then Just (AgendaItem (ai { speakerQueues = tail }))
-                               else Nothing
-
--- | We try to modify the speaker queue with the supplied id.
--- | If the speaker queue isn't found, we give back Nothing.
--- | And if you give us Nothing, we pass it on.
-modifySQ :: Int -> (SpeakerQueue -> Maybe SpeakerQueue) -> AgendaItem -> Maybe AgendaItem
-modifySQ i f (AgendaItem ai) =
-  let {init, rest} = L.span (\(SpeakerQueue s) -> s.id /= i) ai.speakerQueues
-   in case L.uncons rest of
-        Nothing           -> Nothing
-        Just {head, tail} ->
-          f head >>=
-            \f' -> Just (AgendaItem ai { speakerQueues = init <> L.Cons f' tail })
+popSQIfMatchingId i ai
+  =  preview (element 0 _SpeakerQueues <<< _withId i) ai
+  *> traverseOf _SpeakerQueues (L.tail) ai
 
 ------------------------------------------------------------------------------
 -- | Agenda
@@ -97,45 +90,48 @@ modifySQ i f (AgendaItem ai) =
 data Agenda = Agenda Int (Array AgendaItem)
 
 instance rfAg :: ReadForeign Agenda where
-  readImpl fr =
-    readImpl fr
-      <#> Agenda 0
+  readImpl fr = Agenda 0 <$> readImpl fr
 
-currIdx :: Agenda -> Int
-currIdx (Agenda i _) = i
+-- | How to get insight into the agenda.
+_AgendaItems :: Lens' Agenda (Array AgendaItem)
+_AgendaItems
+  = lens
+      (\(Agenda _ items)       -> items)
+      (\(Agenda i _    ) items -> Agenda i items)
 
-curr :: Agenda -> Maybe AgendaItem
-curr (Agenda i as) = A.index as i
+-- | The implementation of this is quite unsafe, but hopefully
+-- | we can't break it. :D
+-- | I think that setIdx makes sure that the invariants hold.
+_CurrentAgendaItem :: Lens' Agenda AgendaItem
+_CurrentAgendaItem
+  = lens
+      (\(Agenda i items)   -> unsafePartial $ fromJust $ A.index items i)
+      (\(Agenda i items) a -> Agenda i $ unsafePartial $ fromJust $ A.updateAt i a items)
 
+-- | Set the internal index to the first argument, and return Just the Agenda.
+-- | If out of bounds, return Nothing.
+setIdx :: Int -> Agenda -> Maybe Agenda
+setIdx i (Agenda _ as) = A.index as i <#> const (Agenda i as)
+
+-- | The next agenda item.
 next :: Agenda -> Maybe Agenda
-next (Agenda i as)
-  | (i+1) >= A.length as = Nothing
-  | true                 = Just (Agenda (i+1) as)
+next a@(Agenda i _) = setIdx (i+1) a
 
+-- | The previous agenda item.
 prev :: Agenda -> Maybe Agenda
-prev (Agenda i as)
-  | (i-1) < 0 = Nothing
-  | true      = Just (Agenda (i-1) as)
+prev a@(Agenda i _) = setIdx (i-1) a
 
+-- | And empty agenda.
 empty :: Agenda
 empty = Agenda 0 []
 
+-- | Insert an agenda item.
 insert :: AgendaItem -> Agenda -> Agenda
-insert a (Agenda i as) = Agenda i (A.insert a as)
-
--- | We try to modify the agenda item with the same id.
--- | If the agenda item isn't found, we give back Nothing.
--- | If you change your mind, just return Nothing in the higher order
--- | function and we forget that it all happened.
-modify :: Int -> (AgendaItem -> Maybe AgendaItem) -> Agenda -> Maybe Agenda
-modify aid f (Agenda c as) =
-  A.findIndex (\(AgendaItem a) -> eq aid a.id) as
-    >>= \idx -> A.index as idx
-    >>= f
-    >>= \a -> A.updateAt idx a as
-    <#> Agenda c
+insert ai = over _AgendaItems (A.insert ai)
 
 -- | This is an interesting beast...
+-- | It jumps to first active or last agenda item.
+-- | It will crash horribly if the agenda is empty.
 jumpToFirstActive :: Agenda -> Agenda
 jumpToFirstActive (Agenda _ as) = Agenda i as
   where
@@ -144,6 +140,5 @@ jumpToFirstActive (Agenda _ as) = Agenda i as
       <|> A.findIndex (\(AgendaItem a) -> a.state /= "done") as)
 
 getCurrentAI :: Agenda -> Either String AgendaItem
-getCurrentAI =
-  note "ERROR: There is no current agenda item." <<< curr
-
+getCurrentAI
+  = note "ERROR: There is no current agenda item." <<< preview _CurrentAgendaItem

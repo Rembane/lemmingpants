@@ -1,17 +1,19 @@
 module Components.Overhead where
 
+import Data.Array as A
 import Data.Either (Either(Right, Left))
+import Data.Lens (preview, view)
 import Data.Maybe (Maybe(..), maybe, maybe')
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Properties as HP
 import Halogen.HTML.Events as HE
-import Prelude (type (~>), Void, id, map, pure, (*>), (<>))
+import Halogen.HTML.Properties as HP
+import Prelude (type (~>), Void, id, map, pure, ($), (*>), (<<<), (<>), (==))
 import Types.Agenda (Agenda, AgendaItem(AgendaItem))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
-import Types.Speaker (visualizeSpeaker)
-import Types.SpeakerQueue (SpeakerQueue(..))
+import Types.Speaker as S
+import Types.SpeakerQueue (_Speakers, _Speaking)
 
 type State =
   { agenda    :: Agenda
@@ -45,16 +47,16 @@ component =
             <>
             [ maybe'
                 (\_ -> HH.p_ [HH.text "ERROR: No speakerqueue found!"])
-                (\(SpeakerQueue sq) ->
+                (\sq ->
                   HH.div_
                   [ HH.p_
                     [ HH.strong_ [HH.text "Speaking: "]
-                    , HH.text (maybe "–" (visualizeSpeaker state.attendees) sq.speaking)
+                    , HH.text (maybe "–" (S.visualizeSpeaker state.attendees) (preview (_Speakers <<< _Speaking) sq))
                     ]
                   , HH.ol_
-                    (map
-                      (\s -> HH.li_ [HH.text (visualizeSpeaker state.attendees s) ])
-                      sq.speakers)
+                    (A.fromFoldable (map
+                      (\s -> HH.li_ [HH.text (S.visualizeSpeaker state.attendees s) ])
+                      (A.dropWhile (\(S.Speaker s) -> s.state == S.Active) $ view _Speakers sq)))
                   ]
                 )
                 (AG.topSQ ai)

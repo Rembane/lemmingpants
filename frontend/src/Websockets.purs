@@ -20,6 +20,9 @@ import Data.Foreign (F, Foreign, readString, toForeign)
 import Data.Maybe (Maybe(..))
 import Prelude (Unit, const, (<<<))
 
+-- TODO: Handle onError and onClose too!
+-- https://pursuit.purescript.org/packages/purescript-dom/4.16.0/docs/DOM.Websocket.Event.EventTypes
+
 wsProducer
   :: forall e
    . WS.WebSocket

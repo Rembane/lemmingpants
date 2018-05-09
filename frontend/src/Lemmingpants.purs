@@ -9,11 +9,15 @@ import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.Except (except, runExcept)
+import Data.Array as A
 import Data.Either (Either(..), note)
 import Data.Either.Nested (Either5)
 import Data.Foldable (foldMap)
 import Data.Foreign (F, Foreign, ForeignError(..), fail, renderForeignError)
 import Data.Functor.Coproduct.Nested (Coproduct5)
+import Data.Lens (over, set, traverseOf)
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Data.Monoid (mempty)
 import Data.String (toLower)
@@ -23,16 +27,18 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (class Show, type (~>), Unit, Void, const, pure, show, unit, ($), (*>), (<#>), (<$), (<>), (=<<), (==), (>>=))
+import Prelude (class Show, type (~>), Unit, Void, const, pure, show, unit, ($), (*>), (<#>), (<$), (<<<), (<>), (=<<), (==), (>>=))
 import Routing.Match (Match)
 import Routing.Match.Class (lit)
 import Simple.JSON (readImpl, readJSON')
-import Types.Agenda (Agenda, AgendaItem(AgendaItem))
+import Type.Prelude (SProxy(..))
+import Types.Agenda (Agenda, AgendaItem(AgendaItem), _AgendaItems, _SpeakerQueues)
 import Types.Agenda as AG
 import Types.Attendee (Attendee, AttendeeDB, insertAttendee)
 import Types.Flash as FL
-import Types.Speaker (Speaker(..))
-import Types.SpeakerQueue (SpeakerQueue(..), addSpeaker, modifySpeaker)
+import Types.Lens (_withId)
+import Types.Speaker as S
+import Types.SpeakerQueue (SpeakerQueue(SpeakerQueue), _Speakers)
 import Types.Token (Payload(..), Token(..), removeToken, saveToken)
 
 type ChildQuery = Coproduct5 CR.Query CO.Query CA.Query CL.Query CH.Query
@@ -228,12 +234,12 @@ component =
             go Insert air ag = pure (AG.insert (newAI air) ag)
             go Update air ag =
               except (note (pure (ForeignError "ERROR: handleAgendaItem: Could not update AgendaItem!"))
-                ((AG.modify air.id (\(AgendaItem x) ->
-                  let (AgendaItem ai) = newAI air
-                   in Just $ AgendaItem (ai { speakerQueues = x.speakerQueues })) ag)))
+                (traverseOf (_AgendaItems <<< _withId air.id) (\(AgendaItem x) ->
+                  Just $ set (_Newtype <<< prop (SProxy :: SProxy "speakerQueues")) x.speakerQueues (newAI air))
+                  ag))
 
             newAI { id, supertitle, title, order_, state } =
-              AgendaItem {id, supertitle, title, order_, state, speakerQueues: mempty }
+              AgendaItem { id, supertitle, title, order_, state, speakerQueues: mempty }
 
         handleAttendee :: F Attendee -> State -> F State
         handleAttendee fr state =
@@ -243,7 +249,7 @@ component =
           :: F { id               :: Int
                , speaker_queue_id :: Int
                , attendee_id      :: Int
-               , state            :: String
+               , state            :: S.SpeakerState
                , times_spoken     :: Maybe Int
                , agenda_item_id   :: Int
                }
@@ -254,18 +260,17 @@ component =
           fr >>= \r ->
             except (note
               (pure (ForeignError ("Modifying the speaker failed.")))
-              (AG.modify
-                r.agenda_item_id
-                (AG.modifySQ r.speaker_queue_id (go action r))
-                st.agenda)
-              <#> \a' -> st { agenda = a' })
+              (traverseOf
+                (prop (SProxy :: SProxy "agenda") <<< _AgendaItems <<< _withId r.agenda_item_id <<< _SpeakerQueues <<< _withId r.speaker_queue_id)
+                (Just <<< go action r)
+                st))
           where
-            go Insert r sq = Just $ addSpeaker (newSpeaker r) sq
-            go Update r sq = Just $ modifySpeaker r.id (const $ newSpeaker r) sq
+            go Insert r = over _Speakers $ A.insert $ newSpeaker r
+            go Update r = set (_Speakers <<< _withId r.id) (newSpeaker r)
 
             newSpeaker {id, attendee_id, state, times_spoken} =
               let ts = fromMaybe 0 times_spoken
-               in Speaker { id, attendeeId: attendee_id, state, timesSpoken: ts }
+               in S.Speaker { id, attendeeId: attendee_id, state, timesSpoken: ts }
 
         handleSpeakerQueue
           :: F { id             :: Int
@@ -279,10 +284,9 @@ component =
           r >>= \{id, agenda_item_id, state} ->
           except (note
             (pure (ForeignError "Modifying the speaker queue failed."))
-            (AG.modify agenda_item_id (go action {id, state}) s.agenda
-              <#> \a' -> s { agenda = a' }))
+            (traverseOf (prop (SProxy :: SProxy "agenda") <<< _AgendaItems <<< _withId agenda_item_id) (go action {id, state}) s))
           where
-            go Insert {id, state} ai = Just (AG.pushSQ (SpeakerQueue {id, state, speaking: Nothing, speakers: []}) ai)
+            go Insert {id, state} ai = Just $ AG.pushSQ (SpeakerQueue {id, state, speakers: mempty}) ai
             go Update {id, state} ai =
               if state == "done"
                 then AG.popSQIfMatchingId id ai

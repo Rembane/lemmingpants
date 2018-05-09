@@ -1,43 +1,52 @@
 module Types.SpeakerQueue
   ( SpeakerQueue(..)
   , SpeakerQueueRecord
-  , invariantDance
-  , addSpeaker
-  , modifySpeaker
+  , _Speaking
+  , _Speakers
   ) where
 
-import Control.Alt ((<|>))
-import Data.Array as A
-import Data.Maybe (Maybe(Nothing, Just), fromMaybe)
+import Data.Array (filter, index, sort)
+import Data.Generic.Rep (class Generic)
+import Data.Lens (Lens', Prism', lens, over, prism')
+import Data.Maybe (Maybe(Nothing, Just))
 import Data.Newtype (class Newtype)
-import Data.Record (modify)
 import Data.Record.ShowRecord (showRecord)
-import Prelude (class Eq, class Ord, class Show, compare, ($), (&&), (/=), (<#>), (<<<), (<>), (==), (>>=), (>>>))
+import Prelude (class Eq, class Ord, class Show, compare, id, pure, (&&), (/=), (<#>), (<<<), (<>), (>>=), (>>>))
 import Simple.JSON (class ReadForeign, readImpl)
-import Type.Prelude (SProxy(..))
+import Test.QuickCheck (class Arbitrary)
+import Test.QuickCheck.Arbitrary (genericArbitrary)
 import Types.Speaker (Speaker(..))
+import Types.Speaker as S
+
+data SpeakerQueueState
+  = Init
+  | Active
+  | Done
 
 type SpeakerQueueRecord =
   { id       :: Int
   , state    :: String
-  , speaking :: Maybe Speaker
   , speakers :: Array Speaker
   }
 newtype SpeakerQueue = SpeakerQueue SpeakerQueueRecord
-derive instance ntSQ :: Newtype SpeakerQueue _
-derive instance eqSQ :: Eq      SpeakerQueue
+derive instance ntSQ  :: Newtype SpeakerQueue _
+derive instance eqSQ  :: Eq      SpeakerQueue
+derive instance genSQ :: Generic SpeakerQueue _
+
+instance arbSQ :: Arbitrary SpeakerQueue where
+  arbitrary = genericArbitrary
 
 instance shSQ :: Show SpeakerQueue where
   show (SpeakerQueue sq) = "SpeakerQueue " <> showRecord sq
 
+-- | Applying the setter for _Speakers is the same as
+-- | applying the deprecated invariantDance to a SpeakerQueue.
+-- | This should uphold the invariants.
 instance rfSQ :: ReadForeign SpeakerQueue where
-  readImpl fr =
-    readImpl fr
-      <#> modify
-            (SProxy :: SProxy "speakers")
-            (A.sort)
-      >>> SpeakerQueue
-      >>> invariantDance
+  readImpl fr
+    =   readImpl fr
+    <#> SpeakerQueue
+    >>> (over _Speakers id)
 
 -- | The speaker queue with the highest id should be on top of the stack.
 -- | This will let us work our way down to the first speaker queue by
@@ -46,45 +55,24 @@ instance ordSQ :: Ord SpeakerQueue where
   compare (SpeakerQueue s1) (SpeakerQueue s2) =
     compare s2.id s1.id
 
--- | Make sure that no speaker on the `speaking` position is done.
--- | And that no speaker in the queue is done or deleted.
--- | And that no speaker first in the queue is active.
-invariantDance :: SpeakerQueue -> SpeakerQueue
-invariantDance = moveActive <<< removeDone
-  where
-    removeDone :: SpeakerQueue -> SpeakerQueue
-    removeDone (SpeakerQueue sq) =
-      SpeakerQueue $ sq { speaking = sq.speaking >>= (\s@(Speaker s') -> if s'.state == "done" then Nothing else Just s)
-                        , speakers = A.filter (\(Speaker x) -> x.state /= "done" && x.state /= "deleted") sq.speakers
-                        }
+_Speakers :: Lens' SpeakerQueue (Array Speaker)
+_Speakers =
+  lens
+    (\(SpeakerQueue {speakers}) -> speakers)
+    (\(SpeakerQueue r) s' ->
+      let f = filter
+                (\(Speaker s) -> s.state /= S.Done && s.state /= S.Deleted)
+              >>> sort
+       in SpeakerQueue r { speakers = f s' })
 
-    moveActive :: SpeakerQueue -> SpeakerQueue
-    moveActive (SpeakerQueue sq) =
-      case A.uncons sq.speakers of
-        Nothing           -> SpeakerQueue sq
-        Just {head, tail} ->
-          let s@(Speaker s') = head
-           in if s'.state == "active"
-                then SpeakerQueue (sq { speaking = Just s, speakers = tail })
-                else SpeakerQueue sq
-
-addSpeaker :: Speaker -> SpeakerQueue -> SpeakerQueue
-addSpeaker s (SpeakerQueue sq) = invariantDance $ SpeakerQueue $ sq { speakers = A.insert s sq.speakers }
-
--- | The first argument is the _id_ of the speaker.
-modifySpeaker :: Int -> (Speaker -> Speaker) -> SpeakerQueue -> SpeakerQueue
-modifySpeaker id_ f (SpeakerQueue sq) = invariantDance $ SpeakerQueue $ fromMaybe sq r
-  where
-    equalId (Speaker s) = s.id == id_
-
-    r =
-      ((A.findIndex equalId sq.speakers
-        >>= (\i -> A.modifyAt i f sq.speakers)
-        <#> (\ss' -> sq { speakers = ss' }))
-      <|>
-      (sq.speaking >>= g))
-
-    g :: Speaker -> Maybe SpeakerQueueRecord
-    g s | equalId s = Just $ sq { speaking = Just (f s) }
-        | true      = Nothing
-
+-- | A lens with focus on someone that is speaking.
+_Speaking :: Prism' (Array Speaker) Speaker
+_Speaking
+  = prism'
+      (pure)
+      (\a -> index a 0
+        >>= \s@(Speaker s') ->
+                case s'.state of
+                  S.Active -> Just s
+                  _        -> Nothing
+      )

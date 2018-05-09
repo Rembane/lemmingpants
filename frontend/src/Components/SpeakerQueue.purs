@@ -7,6 +7,7 @@ import Data.Array as A
 import Data.Either (Either(Right, Left))
 import Data.Foreign (MultipleErrors)
 import Data.HTTP.Method (Method(..))
+import Data.Lens (filtered, preview, traversed, view)
 import Data.Maybe (Maybe(Just, Nothing), fromJust, maybe)
 import Data.StrMap as SM
 import Debug.Trace (traceAnyA)
@@ -19,12 +20,12 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, id, map, pure, show, unit, ($), (*>), (<=), (<>))
-import Simple.JSON (readJSON)
+import Prelude (type (~>), Unit, bind, discard, id, map, pure, show, unit, ($), (*>), (/=), (<<<), (<=), (<>), (==))
+import Simple.JSON (class WriteForeign, readJSON)
 import Types.Attendee (Attendee(..), AttendeeDB, getAttendeeByNumber)
 import Types.Flash as FL
-import Types.Speaker (Speaker(..), visualizeSpeaker)
-import Types.SpeakerQueue (SpeakerQueue(..))
+import Types.Speaker as S
+import Types.SpeakerQueue (SpeakerQueue(..), _Speakers, _Speaking)
 import Types.Token (Token)
 
 type State =
@@ -65,7 +66,7 @@ component =
           [ HP.id_ "speaker-col" ]
           [ HH.p_
             [ HH.strong_ [ HH.text "Speaking: " ]
-            , HH.text (maybe "–" (visualizeSpeaker state.attendees) sq.speaking)
+            , HH.text (maybe "–" (S.visualizeSpeaker state.attendees) (preview (_Speakers <<< _Speaking) state.speakerQueue))
             ]
           , HH.table
               [ HP.id_ "attendee-table" ]
@@ -84,19 +85,19 @@ component =
                   ]
                 ]
               ] <>
-              (map
-                (\s@(Speaker s') ->
+              (A.fromFoldable (map
+                (\s@(S.Speaker s') ->
                   HH.tr_
                     [ HH.td
                       [ HP.class_ (HH.ClassName "id") ]
                       [ HH.text (show s'.attendeeId) ]
-                    , HH.td_ [ HH.text (visualizeSpeaker state.attendees s) ]
+                    , HH.td_ [ HH.text (S.visualizeSpeaker state.attendees s) ]
                     , HH.td
                         [ HP.class_ (HH.ClassName "numspoken") ]
                         [ HH.text (show s'.timesSpoken) ]
                     , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
                     ])
-                sq.speakers))
+                (A.dropWhile (\(S.Speaker s) -> s.state == S.Active) $ view _Speakers state.speakerQueue))))
           ]
         , HH.div
             [ HP.id_ "speaker-button-col" ]
@@ -127,39 +128,29 @@ component =
                 (HE.input FormMsg)
             ]
         ]
-      where
-        (SpeakerQueue sq) = state.speakerQueue
 
     eval :: Query ~> H.ParentDSL State Query F.Query Unit Message (Aff (LemmingPantsEffects e))
     eval =
       case _ of
         PushSQ next -> do
           state <- H.get
-          r <- H.liftAff $ PG.emptyResponse
-             (createURL "/speaker_queue")
-            state.token
+          ajaxHelper
+            "/speaker_queue"
             POST
             { agenda_item_id: state.agendaItemId
             , state:          "active" }
-          case r.status of
-            StatusCode 201 -> -- The `Created` HTTP status code.
-              pure unit
-            _ ->
-              H.raise $ Flash $ FL.mkFlash "PushSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
+            201
+            "PushSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           *> pure next
         PopSQ next -> do
           state <- H.get
           let (SpeakerQueue sq) = state.speakerQueue
-          r <- H.liftAff $ PG.emptyResponse
-             (createURL $ "/speaker_queue?id=eq." <> show sq.id)
-             state.token
-             PATCH
-             { state: "done" }
-          case r.status of
-            StatusCode 204 -> -- No Content
-              pure unit
-            _ ->
-              H.raise $ Flash $ FL.mkFlash "PopSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
+          ajaxHelper
+            ("/speaker_queue?id=eq." <> show sq.id)
+            PATCH
+            { state: "done" }
+            204
+            "PopSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           *> pure next
         FormMsg m next -> do
           state <- H.get
@@ -190,49 +181,55 @@ component =
           *> pure next
         Next next -> do
           state <- H.get
-          let (SpeakerQueue sq) = state.speakerQueue
-          case A.head sq.speakers of
-            Nothing          -> pure unit
-            Just (Speaker s) -> do
-              r <- H.liftAff $ PG.emptyResponse
-                      (createURL "/rpc/set_current_speaker")
-                      state.token
-                      POST
-                      {id: s.id}
-              case r.status of
-                StatusCode 200 ->
-                  pure unit
-                _ ->
-                  H.raise $ Flash $ FL.mkFlash "SpeakerQueue.Next -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
-          *> pure next
+          case preview (_Speakers <<< traversed <<< filtered (\(S.Speaker s) -> s.state /= S.Active)) state.speakerQueue of
+            Nothing            -> pure unit
+            Just (S.Speaker s) -> do
+              ajaxHelper
+                "/rpc/set_current_speaker"
+                POST
+                { id: s.id }
+                200
+                "SpeakerQueue.Next -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          pure next
         Eject next -> do
           state <- H.get
           let (SpeakerQueue sq) = state.speakerQueue
-          case sq.speaking of
-            Nothing          -> pure unit
-            Just (Speaker s) -> do
-              r <- H.liftAff $ PG.emptyResponse
-                      (createURL $ "/speaker?id=eq." <> show s.id)
-                      state.token
-                      PATCH
-                      { state: "done" }
-              case r.status of
-                StatusCode 204 -> -- The `Created` HTTP status code.
-                  pure unit
-                _ ->
-                  H.raise $ Flash $ FL.mkFlash "SpeakerQueue.Eject -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
-          *> pure next
+          case preview (_Speakers <<< _Speaking) state.speakerQueue of
+            Nothing            -> pure unit
+            Just (S.Speaker s) -> do
+              ajaxHelper
+                ("/speaker?id=eq." <> show s.id)
+                PATCH
+                { state: "done" }
+                204
+                "SpeakerQueue.Eject -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          pure next
         Delete id_ next -> do
-          state <- H.get
-          r <- H.liftAff $ PG.emptyResponse
-                  (createURL $ "/speaker?id=eq." <> show id_)
-                  state.token
-                  PATCH
-                  { state: "deleted" }
-          case r.status of
-            StatusCode 204 -> -- The `Created` HTTP status code.
-              pure unit
-            _ ->
-              H.raise $ Flash $ FL.mkFlash "SpeakerQueue.Delete -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
-          *> pure next
+          ajaxHelper
+            ("/speaker?id=eq." <> show id_)
+            PATCH
+            { state: "deleted" }
+            204
+            "SpeakerQueue.Delete -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          pure next
         GotNewState s next -> H.put s *> pure next
+
+ajaxHelper
+  :: forall e r
+   . WriteForeign r
+  => String
+  -> Method
+  -> r
+  -> Int
+  -> String
+  -> H.ParentDSL State Query F.Query Unit Message (Aff (LemmingPantsEffects e)) Unit
+ajaxHelper partialUrl method dta code msg = do
+  state <- H.get
+  r <- H.liftAff $ PG.emptyResponse
+          (createURL partialUrl)
+          state.token
+          method
+          dta
+  if r.status == StatusCode code
+    then pure unit
+    else H.raise $ Flash $ FL.mkFlash msg FL.Error

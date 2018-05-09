@@ -28,8 +28,8 @@ newtype Attendee = Attendee
   , nick    :: Maybe String
   , numbers :: Array Int
   }
-derive instance         eqAt :: Eq          Attendee
-derive instance         ntAt :: Newtype     Attendee _
+derive instance eqAt :: Eq      Attendee
+derive instance ntAt :: Newtype Attendee _
 
 instance rfAt :: ReadForeign Attendee where
   readImpl fr =
@@ -40,7 +40,7 @@ instance rfAt :: ReadForeign Attendee where
       >>> Attendee
     where
       go :: Array { id :: Int } -> Array Int
-      go = (map (\{id} -> id))
+      go = map \{id} -> id
 
 visualizeAttendee :: Attendee -> String
 visualizeAttendee (Attendee a) =

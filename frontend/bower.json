@@ -22,10 +22,15 @@
     "purescript-aff-coroutines": "^6.0.0",
     "purescript-errors": "^3.0.0",
     "purescript-validation": "^3.2.0",
-    "purescript-now": "^3.0.0"
+    "purescript-now": "^3.0.0",
+    "purescript-generics-rep": "^5.4.0",
+    "purescript-monoid": "^3.3.0"
   },
   "devDependencies": {
     "purescript-debug": "^3.0.0",
-    "purescript-psci-support": "^3.0.0"
+    "purescript-psci-support": "^3.0.0",
+    "purescript-quickcheck": "^4.7.0",
+    "purescript-spec": "^2.0.0",
+    "purescript-spec-quickcheck": "^2.0.0"
   }
 }

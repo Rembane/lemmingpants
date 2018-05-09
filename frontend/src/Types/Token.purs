@@ -64,12 +64,9 @@ parseToken raw =
   note
     (pure (ForeignError "Token has weird format. It lacks dots. I cannot parse this."))
     (A.index (Pattern "." `split` raw) 1)
-  >>=
-    lmap (pure <<< ForeignError <<< show) <<< atob
-  >>=
-    readJSON
-  <#>
-    \payload -> Token {raw, payload}
+  >>= lmap (pure <<< ForeignError <<< show) <<< atob
+  >>= readJSON
+  <#> \payload -> Token {raw, payload}
 
 saveToken :: forall e. Token -> Aff (webStorage :: WEB_STORAGE | e) Unit
 saveToken (Token t) = liftEff' (setItem localStorage tokenKey t.raw)
