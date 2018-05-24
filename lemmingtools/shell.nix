@@ -6,7 +6,7 @@ let
   inherit (nixpkgs) pkgs;
 
   f = { mkDerivation, base, bytestring, megaparsec
-      , postgresql-simple, stdenv, text
+      , postgresql-simple, stdenv, text, optparse-applicative
       }:
       mkDerivation {
         pname = "lemmingtools";
@@ -18,7 +18,7 @@ let
           base bytestring megaparsec postgresql-simple text
         ];
         executableHaskellDepends = [
-          base bytestring megaparsec postgresql-simple text
+          base bytestring megaparsec postgresql-simple text optparse-applicative
         ];
         testHaskellDepends = [ base ];
         homepage = "https://github.com/githubuser/lemmingtools#readme";
@@ -30,10 +30,15 @@ let
                        then pkgs.haskell.packages.ghc822
                        else pkgs.haskell.packages.${compiler};
 
+
+  optparse-applicative = haskellPackages.callPackage ./nix-support/optparse-applicative-0.14.2.0.nix {};
   parser-combinators = haskellPackages.callPackage ./nix-support/parser-combinators-0.4.0.nix {};
   megaparsec = dontCheck (haskellPackages.callPackage ./nix-support/megaparsec-6.4.1.nix { parser-combinators = parser-combinators; });
 
-  drv = haskellPackages.callPackage f { megaparsec = megaparsec; };
+  drv = haskellPackages.callPackage f {
+    megaparsec = megaparsec;
+    optparse-applicative = optparse-applicative;
+  };
 
 in
 
