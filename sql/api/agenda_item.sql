@@ -35,7 +35,6 @@ CREATE FUNCTION set_current_agenda_item(id INTEGER) RETURNS INTEGER
     END
     $$;
 
-REVOKE ALL ON FUNCTION set_current_agenda_item(id INTEGER) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION set_current_agenda_item(id INTEGER) TO admin_user;
 
 CREATE TRIGGER agenda_item_news
