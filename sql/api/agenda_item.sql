@@ -25,6 +25,7 @@ CREATE FUNCTION set_current_agenda_item(id INTEGER) RETURNS INTEGER
     DECLARE
         n INTEGER = 0;
     BEGIN
+        SET SCHEMA 'api';
         IF EXISTS(SELECT 1 FROM agenda_item WHERE agenda_item.id=set_current_agenda_item.id) THEN
             UPDATE agenda_item SET state='done' WHERE state='active';
             UPDATE agenda_item SET state='active' WHERE agenda_item.id=set_current_agenda_item.id RETURNING agenda_item.id INTO n;
