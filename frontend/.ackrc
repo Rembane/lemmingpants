@@ -1,3 +1,4 @@
 --ignore-dir=bower_components
 --ignore-dir=output
+--ignore-dir=.psc-package
 --ignore-file=is:main.js
