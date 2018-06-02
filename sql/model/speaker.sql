@@ -20,7 +20,14 @@ CREATE UNIQUE INDEX ON speaker (speaker_queue_id) WHERE state='active';
 -- That is, you must speak before you add yourself to the queue again.
 CREATE UNIQUE INDEX ON speaker (speaker_queue_id, attendee_id) WHERE state IN ('active', 'init');
 
-GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user;
+GRANT SELECT ON speaker TO read_access;
+GRANT INSERT (speaker_queue_id, attendee_id, state) ON speaker TO admin_user, authorized_attendee;
+GRANT UPDATE (state) ON speaker TO admin_user;
+GRANT REFERENCES ON speaker TO admin_user;
+
+GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user, authorized_attendee;
+
+-- CREATE POLICY insert_me_as_a_speaker ON speaker FOR INSERT
 
 -- This is websocket_news() on steroids.
 -- It does a join with active_speakers to give us the data we want

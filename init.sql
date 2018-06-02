@@ -16,6 +16,8 @@ CREATE SCHEMA api AUTHORIZATION lemmingpants;
 
 CREATE TYPE model.state AS ENUM ('init', 'active', 'done');
 
+CREATE TYPE api.jwt_token AS (token TEXT);
+
 -- The data model for Lemmingpants
 \i sql/model.sql
 \i sql/model/agenda_item.sql

@@ -1,7 +1,8 @@
 SET SCHEMA 'api';
 
 CREATE VIEW speaker AS
-    SELECT * FROM model.speaker;
+    SELECT * FROM model.speaker
+    WITH CASCADED CHECK OPTION;
 
 GRANT SELECT ON speaker TO read_access;
 -- GRANT SELECT, REFERENCES ON speaker TO read_access;
