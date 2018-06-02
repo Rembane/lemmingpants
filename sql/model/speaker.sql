@@ -13,6 +13,7 @@ CREATE TABLE speaker (
     state            speaker_state DEFAULT 'init' NOT NULL,
     created          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
 -- At most one speaker per queue may be active at the same time.
 CREATE UNIQUE INDEX ON speaker (speaker_queue_id) WHERE state='active';
 
@@ -20,7 +21,33 @@ CREATE UNIQUE INDEX ON speaker (speaker_queue_id) WHERE state='active';
 -- That is, you must speak before you add yourself to the queue again.
 CREATE UNIQUE INDEX ON speaker (speaker_queue_id, attendee_id) WHERE state IN ('active', 'init');
 
-GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user;
+GRANT SELECT ON speaker TO read_access;
+GRANT INSERT (speaker_queue_id, attendee_id) ON speaker TO admin_user, authorized_attendee;
+GRANT UPDATE (state) ON speaker TO admin_user;
+GRANT REFERENCES ON speaker TO admin_user;
+GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user, authorized_attendee;
+
+CREATE FUNCTION speaker_only_insert_myself() RETURNS TRIGGER
+    LANGUAGE plpgsql SET search_path = model, api, public, pg_temp
+    AS $$
+    BEGIN
+        IF current_user <> 'authorized_attendee'
+            THEN RETURN NEW;
+        ELSIF current_setting('request.jwt.claim.lp_aid')::INTEGER = NEW.attendee_id
+            THEN RETURN NEW;
+        ELSE
+            RAISE sqlstate 'PT403' USING
+                message = 'You are not allowed to insert speakers.',
+                detail = '',
+                hint = '';
+        END IF;
+    END
+    $$;
+
+CREATE TRIGGER speaker_only_insert_myself
+    BEFORE INSERT ON speaker
+    FOR EACH ROW
+    EXECUTE PROCEDURE speaker_only_insert_myself();
 
 -- This is websocket_news() on steroids.
 -- It does a join with active_speakers to give us the data we want

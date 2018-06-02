@@ -4,9 +4,8 @@ CREATE VIEW speaker AS
     SELECT * FROM model.speaker;
 
 GRANT SELECT ON speaker TO read_access;
--- GRANT SELECT, REFERENCES ON speaker TO read_access;
--- GRANT INSERT (speaker_queue_id, attendee_id, state) ON speaker TO admin_user;
--- GRANT UPDATE (state) ON speaker TO admin_user;
+GRANT INSERT (speaker_queue_id, attendee_id) ON speaker TO admin_user, authorized_attendee;
+GRANT UPDATE (state) ON speaker TO admin_user;
 
 -- This is used to determine the order of the speakers.
 -- It lets us have an infinite number of speakers queues.

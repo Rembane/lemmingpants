@@ -3,6 +3,17 @@
 
 -- Roles / Groups --------------------------------------------------------------
 -- And their permissions                                                      --
+--
+-- roles and their members:
+--     - read_access
+--         - web_anon
+--         - authorized_attendee
+--         - admin_user
+--     - web_anon
+--         - lemmingpants
+--     - authenticator
+--     - authorized_attendee
+--     - admin_user
 
 -- TODO: Create the authenticator role. A non-privileged one with NOINHERIT.
 
@@ -19,6 +30,12 @@ DROP ROLE IF EXISTS web_anon;
 CREATE ROLE web_anon NOLOGIN;
 GRANT web_anon TO lemmingpants;
 GRANT read_access TO web_anon;
+
+-- authorized_attendee can add and remove itself from speaker_queues.
+DROP ROLE IF EXISTS authorized_attendee;
+CREATE ROLE authorized_attendee NOLOGIN;
+GRANT authorized_attendee TO lemmingpants;
+GRANT read_access TO authorized_attendee;
 
 -- The admin user can do a lot of fun things.
 DROP ROLE IF EXISTS admin_user;

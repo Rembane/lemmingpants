@@ -1,4 +1,3 @@
--- \unset ECHO
 \i test_setup.sql
 
 CREATE SCHEMA testing AUTHORIZATION lemmingpants;
@@ -109,6 +108,7 @@ $$;
 CREATE OR REPLACE FUNCTION testing.test_attendee_functions()
 RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
 BEGIN
+    PERFORM set_config('app.jwt_secret', 'reallysecret', true);
     RETURN NEXT lives_ok('SELECT api.create_attendee(1, ''CID'', ''name'', ''witty nickname'')',
         'We can create an attendee.');
     RETURN NEXT results_eq('SELECT cid FROM api.attendee', 'SELECT ''cid''',
@@ -177,7 +177,21 @@ CREATE OR REPLACE FUNCTION testing.test_speaker()
 RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
 DECLARE
     aid INTEGER;
+    aid2 INTEGER;
 BEGIN
+    RETURN NEXT table_privs_are('api', 'speaker',
+        'read_access', ARRAY['SELECT']);
+    RETURN NEXT table_privs_are('api', 'speaker',
+        'authorized_attendee', ARRAY['SELECT']);
+    RETURN NEXT table_privs_are('api', 'speaker',
+        'admin_user', ARRAY['SELECT']);
+    RETURN NEXT column_privs_are('api', 'speaker', 'speaker_queue_id',
+        'authorized_attendee', ARRAY['SELECT', 'INSERT']);
+    RETURN NEXT column_privs_are('api', 'speaker', 'attendee_id',
+        'authorized_attendee', ARRAY['SELECT', 'INSERT']);
+    RETURN NEXT column_privs_are('api', 'speaker', 'state',
+        'admin_user', ARRAY['SELECT', 'UPDATE']);
+
     INSERT INTO model.agenda_item(title, order_) VALUES('THIS IS A TITLE', 1);
     PERFORM api.create_attendee(1, 'CID', 'name', 'witty nickname');
     INSERT INTO model.speaker_queue(id, agenda_item_id) VALUES(1, 1);
@@ -192,6 +206,25 @@ BEGIN
     RETURN NEXT results_eq('SELECT state FROM api.speaker WHERE id=1',
         ARRAY['active'::speaker_state],
         'The state should now be active.');
+    UPDATE api.speaker SET state='done';
+
+    -- Test that an attendee can create speakers in an orderly fashion.
+    PERFORM api.create_attendee(2, 'A new CID', 'A new name', 'A new witty nickname');
+    SELECT api.attendee.id INTO aid2
+        FROM api.attendee
+        JOIN api.attendee_number
+        ON api.attendee.id = api.attendee_number.attendee_id
+        WHERE api.attendee_number.id = 2;
+    PERFORM set_config('app.jwt_secret', 'reallysecret', false);
+    PERFORM set_config('request.jwt.claim.lp_aid', aid2::text, false);
+    SET ROLE 'authorized_attendee';
+    RETURN NEXT lives_ok('INSERT INTO api.speaker(speaker_queue_id, attendee_id) VALUES (1, ' || aid2 || ')',
+        'An authorized attendee should be able to insert itself in the speaker queue.');
+    RETURN NEXT throws_ok('INSERT INTO api.speaker(speaker_queue_id, attendee_id) VALUES (1, ' || aid || ')',
+        'PT403', 'You are not allowed to insert speakers.',
+        'But it should not be able to insert a speaker for somebody else.');
+    RETURN NEXT is_empty('SELECT * FROM speaker WHERE attendee_id=2 AND state = ''init''',
+        'No speakers without permissions should be inserted.');
 END;
 $$;
 
