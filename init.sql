@@ -1,24 +1,29 @@
 -- Initialization ------------------------------------------------------------
 --
--- The role lemmingpants and the database lemmingpants must exist!
-
+-- NOTE: The role lemmingpants and the database lemmingpants must exist!
+--
+-- Drop all schemas, recreate them and make sure that Lemmingpants own them.
 DROP SCHEMA IF EXISTS model CASCADE;
-CREATE SCHEMA model;
+CREATE SCHEMA model AUTHORIZATION lemmingpants;
 
 DROP SCHEMA IF EXISTS api CASCADE;
 CREATE SCHEMA api AUTHORIZATION lemmingpants;
-GRANT ALL PRIVILEGES ON SCHEMA api TO lemmingpants;
 
-CREATE TYPE api.state AS ENUM ('init', 'active', 'done');
+CREATE TYPE model.state AS ENUM ('init', 'active', 'done');
 
-\i sql/role.sql
+-- The data model for Lemmingpants
 \i sql/model.sql
+\i sql/model/agenda_item.sql
+\i sql/model/speaker_queue.sql
+\i sql/model/attendee.sql
+\i sql/model/speaker.sql
+
 -- Public tables, views and functions
-\i sql/api/websocket.sql
 \i sql/api/attendee.sql
 \i sql/api/agenda_item.sql
 \i sql/api/speaker_queue.sql
 \i sql/api/speaker.sql
 \i sql/api/auth.sql
+
 -- Example data
 \i sql/example.sql
