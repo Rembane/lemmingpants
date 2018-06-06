@@ -7,7 +7,6 @@ module Types.Token
   , removeToken
   ) where
 
-import Browser.WebStorage (WEB_STORAGE, getItem, localStorage, removeItem, setItem)
 import Control.Error.Util ((!?))
 import Control.Monad.Aff (Aff, liftEff')
 import Control.Monad.Eff.Exception (Error)

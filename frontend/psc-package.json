@@ -1,0 +1,26 @@
+{
+    "name": "lemmingpants-frontend",
+    "set": "master",
+    "source": "file:///home/hace/dev/purescript/package-sets",
+    "depends": [
+        "prelude",
+        "halogen",
+        "console",
+        "aff",
+        "affjax",
+        "simple-json",
+        "routing",
+        "string-parsers",
+        "coroutines",
+        "aff-coroutines",
+        "validation",
+        "now",
+        "generics-rep",
+        "debug",
+        "psci-support",
+        "quickcheck",
+        "spec",
+        "spec-quickcheck",
+        "record-extra"
+    ]
+}
