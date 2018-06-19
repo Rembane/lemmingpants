@@ -7,20 +7,24 @@ module Types.Token
   , removeToken
   ) where
 
+import Effect.Class
+
 import Control.Error.Util ((!?))
-import Control.Monad.Aff (Aff, liftEff')
-import Control.Monad.Eff.Exception (Error)
 import Control.Monad.Except.Trans (except, runExceptT)
 import Data.Array as A
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..), note)
-import Data.Foreign (ForeignError(..), MultipleErrors)
 import Data.Function.Uncurried (Fn3, runFn3)
 import Data.Newtype (class Newtype)
-import Data.Record.ShowRecord (showRecord)
 import Data.String (Pattern(..), split)
+import Effect.Aff (Aff)
+import Effect.Exception (Error)
+import Foreign (ForeignError(..), MultipleErrors)
 import Prelude (class Eq, class Show, Unit, pure, show, ($), (<#>), (<<<), (<>), (>>=), (>>>))
 import Simple.JSON (class ReadForeign, readJSON)
+import Web.HTML (Window)
+import Web.HTML.Window (localStorage)
+import Web.Storage.Storage (getItem, removeItem, setItem)
 
 -- | This module handles tokens.
 
@@ -38,7 +42,7 @@ derive newtype instance rfPl :: ReadForeign Payload
 derive instance         eqPl :: Eq          Payload
 
 instance showPl :: Show Payload where
-  show (Payload p) = showRecord p
+  show (Payload p) = show p
 
 newtype Token = Token
   { raw     :: String
@@ -46,7 +50,7 @@ newtype Token = Token
   }
 
 instance showToken :: Show Token where
-  show (Token t) = "Token: " <> showRecord t
+  show (Token t) = "Token: " <> show t
 
 foreign import _atob
   :: Fn3
@@ -67,15 +71,15 @@ parseToken raw =
   >>= readJSON
   <#> \payload -> Token {raw, payload}
 
-saveToken :: forall e. Token -> Aff (webStorage :: WEB_STORAGE | e) Unit
-saveToken (Token t) = liftEff' (setItem localStorage tokenKey t.raw)
+saveToken :: Window -> Token -> Aff Unit
+saveToken w (Token t) = liftEffect (localStorage w >>= setItem tokenKey t.raw)
 
-loadToken :: forall e. Aff (webStorage :: WEB_STORAGE | e) (Either MultipleErrors Token)
-loadToken = liftEff' $ runExceptT $
-  getItem localStorage tokenKey
+loadToken :: Window -> Aff (Either MultipleErrors Token)
+loadToken w = liftEffect $ localStorage w >>=
+  \s -> runExceptT $ getItem tokenKey s
     !? (pure (ForeignError "No token found."))
     >>= parseToken
     >>> except
 
-removeToken :: forall e. Aff (webStorage :: WEB_STORAGE | e) Unit
-removeToken = liftEff' $ removeItem localStorage tokenKey
+removeToken :: Window -> Aff Unit
+removeToken w = liftEffect $ localStorage w >>= removeItem tokenKey

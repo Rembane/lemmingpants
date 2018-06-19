@@ -5,12 +5,11 @@ module Types.Speaker
   ) where
 
 import Control.Monad.Except (throwError)
-import Data.Foreign (ForeignError(..))
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (maybe)
 import Data.Newtype (class Newtype)
-import Data.Record.ShowRecord (showRecord)
-import Prelude (class Eq, class Ord, class Show, compare, pure, ($), (<>), (>>=))
+import Foreign (ForeignError(..))
+import Prelude (class Eq, class Ord, class Show, compare, pure, show, ($), (<>), (>>=))
 import Simple.JSON (class ReadForeign, readImpl)
 import Test.QuickCheck (class Arbitrary)
 import Test.QuickCheck.Arbitrary (genericArbitrary)
@@ -60,7 +59,7 @@ instance arbSQ :: Arbitrary Speaker where
   arbitrary = genericArbitrary
 
 instance shSp :: Show Speaker where
-  show (Speaker s) = "Speaker " <> showRecord s
+  show (Speaker s) = "Speaker " <> show s
 
 instance ordSp :: Ord Speaker where
   compare (Speaker s1) (Speaker s2) =

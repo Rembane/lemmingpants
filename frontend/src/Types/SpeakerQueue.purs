@@ -10,8 +10,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', Prism', lens, over, prism')
 import Data.Maybe (Maybe(Nothing, Just))
 import Data.Newtype (class Newtype)
-import Data.Record.ShowRecord (showRecord)
-import Prelude (class Eq, class Ord, class Show, compare, id, pure, (&&), (/=), (<#>), (<<<), (<>), (>>=), (>>>))
+import Prelude (class Eq, class Ord, class Show, compare, identity, pure, show, (&&), (/=), (<#>), (<>), (>>=), (>>>))
 import Simple.JSON (class ReadForeign, readImpl)
 import Test.QuickCheck (class Arbitrary)
 import Test.QuickCheck.Arbitrary (genericArbitrary)
@@ -37,7 +36,7 @@ instance arbSQ :: Arbitrary SpeakerQueue where
   arbitrary = genericArbitrary
 
 instance shSQ :: Show SpeakerQueue where
-  show (SpeakerQueue sq) = "SpeakerQueue " <> showRecord sq
+  show (SpeakerQueue sq) = "SpeakerQueue " <> show sq
 
 -- | Applying the setter for _Speakers is the same as
 -- | applying the deprecated invariantDance to a SpeakerQueue.
@@ -46,7 +45,7 @@ instance rfSQ :: ReadForeign SpeakerQueue where
   readImpl fr
     =   readImpl fr
     <#> SpeakerQueue
-    >>> (over _Speakers id)
+    >>> (over _Speakers identity)
 
 -- | The speaker queue with the highest id should be on top of the stack.
 -- | This will let us work our way down to the first speaker queue by

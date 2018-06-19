@@ -2,16 +2,15 @@ module Components.SpeakerQueue where
 
 import Components.Forms as F
 import Components.Forms.Field (mkField)
-import Control.Monad.Aff (Aff)
 import Data.Array as A
 import Data.Either (Either(Right, Left))
-import Data.Foreign (MultipleErrors)
 import Data.HTTP.Method (Method(..))
 import Data.Lens (filtered, preview, traversed, view)
 import Data.Maybe (Maybe(Just, Nothing), fromJust, maybe)
-import Data.StrMap as SM
-import Debug.Trace (traceAnyA)
-import Effects (LemmingPantsEffects)
+import Debug.Trace (traceM)
+import Effect.Aff (Aff)
+import Foreign (MultipleErrors)
+import Foreign.Object as FO
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -20,7 +19,7 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, discard, id, map, pure, show, unit, ($), (*>), (/=), (<<<), (<=), (<>), (==))
+import Prelude (type (~>), Unit, bind, discard, identity, map, pure, show, unit, ($), (*>), (/=), (<<<), (<=), (<>), (==))
 import Simple.JSON (class WriteForeign, readJSON)
 import Types.Attendee (Attendee(..), AttendeeDB, getAttendeeByNumber)
 import Types.Flash as FL
@@ -48,17 +47,17 @@ data Query a
 data Message
   = Flash FL.Flash
 
-component :: forall e. H.Component HH.HTML Query State Message (Aff (LemmingPantsEffects e))
+component :: H.Component HH.HTML Query State Message Aff
 component =
   H.parentComponent
-    { initialState: id
+    { initialState: identity
     , render
     , eval
     , receiver: HE.input GotNewState
     }
 
   where
-    render :: State -> H.ParentHTML Query F.Query Unit (Aff (LemmingPantsEffects e))
+    render :: State -> H.ParentHTML Query F.Query Unit Aff
     render state =
       HH.div
         [ HP.id_ "speakerhandling-container" ]
@@ -129,7 +128,7 @@ component =
             ]
         ]
 
-    eval :: Query ~> H.ParentDSL State Query F.Query Unit Message (Aff (LemmingPantsEffects e))
+    eval :: Query ~> H.ParentDSL State Query F.Query Unit Message Aff
     eval =
       case _ of
         PushSQ next -> do
@@ -157,8 +156,8 @@ component =
           let (SpeakerQueue sq) = state.speakerQueue
           case m of
             F.FormSubmitted m' ->
-              case readJSON (unsafePartial (fromJust (SM.lookup "id" m'))) :: Either MultipleErrors Int of
-                Left es -> traceAnyA es
+              case readJSON (unsafePartial (fromJust (FO.lookup "id" m'))) :: Either MultipleErrors Int of
+                Left es -> traceM es
                 Right n -> do
                   case getAttendeeByNumber n state.attendees of
                     Nothing           ->
@@ -215,14 +214,14 @@ component =
         GotNewState s next -> H.put s *> pure next
 
 ajaxHelper
-  :: forall e r
+  :: forall r
    . WriteForeign r
   => String
   -> Method
   -> r
   -> Int
   -> String
-  -> H.ParentDSL State Query F.Query Unit Message (Aff (LemmingPantsEffects e)) Unit
+  -> H.ParentDSL State Query F.Query Unit Message Aff Unit
 ajaxHelper partialUrl method dta code msg = do
   state <- H.get
   r <- H.liftAff $ PG.emptyResponse

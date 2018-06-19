@@ -1,26 +1,29 @@
 {
     "name": "lemmingpants-frontend",
     "set": "master",
-    "source": "file:///home/hace/dev/purescript/package-sets",
+    "source": "https://github.com/Rembane/package-sets.git",
     "depends": [
         "prelude",
         "halogen",
         "console",
         "aff",
         "affjax",
+        "errors",
+        "foreign-object",
         "simple-json",
         "routing",
         "string-parsers",
-        "coroutines",
-        "aff-coroutines",
         "validation",
         "now",
         "generics-rep",
         "debug",
+        "ordered-collections",
         "psci-support",
         "quickcheck",
         "spec",
         "spec-quickcheck",
-        "record-extra"
+        "record-extra",
+        "web-html",
+        "web-socket"
     ]
 }

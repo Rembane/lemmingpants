@@ -7,7 +7,7 @@ package: compile
 	mv main2.js ../static/main.js
 
 compile: styles
-	pulp browserify -O > main.js
+	pulp --psc-package browserify -O > main.js
 
 dev: compile
 	 cp main.js ../static/

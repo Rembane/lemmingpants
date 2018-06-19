@@ -6,14 +6,11 @@ import Components.Login as CL
 import Components.Overhead as CO
 import Components.Registration as CR
 import Control.Alt ((<|>))
-import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.Console (log)
 import Control.Monad.Except (except, runExcept)
 import Data.Array as A
 import Data.Either (Either(..), note)
 import Data.Either.Nested (Either5)
 import Data.Foldable (foldMap)
-import Data.Foreign (F, Foreign, ForeignError(..), fail, renderForeignError)
 import Data.Functor.Coproduct.Nested (Coproduct5)
 import Data.Lens (over, set, traverseOf)
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -21,16 +18,18 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Data.Monoid (mempty)
 import Data.String (toLower)
-import Effects (LemmingPantsEffects)
+import Effect.Aff (Aff)
+import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
+import Foreign (F, Foreign, ForeignError(..), fail, renderForeignError, unsafeFromForeign)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (class Show, type (~>), Unit, Void, const, pure, show, unit, ($), (*>), (<#>), (<$), (<<<), (<>), (=<<), (==), (>>=))
-import Routing.Match (Match)
-import Routing.Match.Class (lit)
-import Simple.JSON (readImpl, readJSON')
+import Prelude (class Show, type (~>), Unit, Void, bind, discard, const, pure, show, unit, ($), (*>), (<#>), (<$), (<<<), (<>), (=<<), (==), (>>=))
+import Routing.Match (Match, lit)
+import Simple.JSON (read', readImpl)
 import Type.Prelude (SProxy(..))
 import Types.Agenda (Agenda, AgendaItem(AgendaItem), _AgendaItems, _SpeakerQueues)
 import Types.Agenda as AG
@@ -40,6 +39,7 @@ import Types.Lens (_withId)
 import Types.Speaker as S
 import Types.SpeakerQueue (SpeakerQueue(SpeakerQueue), _Speakers)
 import Types.Token (Payload(..), Token(..), removeToken, saveToken)
+import Web.HTML (Window)
 
 type ChildQuery = Coproduct5 CR.Query CO.Query CA.Query CL.Query CH.Query
 type ChildSlot  = Either5 Int Int Int Int Int
@@ -78,6 +78,7 @@ type State =
   , agenda          :: Agenda
   , attendees       :: AttendeeDB
   , showRegForm     :: Boolean
+  , window          :: Window
   }
 
 data Query a
@@ -86,11 +87,11 @@ data Query a
   | AdminMsg        CA.Message a
   | LoginMsg        CL.Message a
   | RegistrationMsg CR.Message a
-  | WSMsg           String     a
+  | WSMsg           Foreign    a
 
-type Input = { token :: Token, agenda :: Agenda, attendees :: AttendeeDB }
+type Input = { token :: Token, agenda :: Agenda, attendees :: AttendeeDB, window :: Window }
 
-component :: forall e. H.Component HH.HTML Query Input Void (Aff (LemmingPantsEffects e))
+component :: H.Component HH.HTML Query Input Void Aff
 component =
   H.parentComponent
     { initialState
@@ -107,9 +108,10 @@ component =
       , agenda:          i.agenda
       , attendees:       i.attendees
       , showRegForm:     true
+      , window:          i.window
       }
 
-    render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
+    render :: State -> H.ParentHTML Query ChildQuery ChildSlot Aff
     render state =
       HH.div
         [ HP.id_ (toLower (show state.currentLocation)) ]
@@ -130,7 +132,7 @@ component =
       where
         loginlogoutlink
           :: State
-          -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
+          -> H.ParentHTML Query ChildQuery ChildSlot Aff
         loginlogoutlink s =
           let (Token t)   = s.token
               (Payload p) = t.payload
@@ -143,7 +145,7 @@ component =
         locationToSlot
           :: Location
           -> State
-          -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
+          -> H.ParentHTML Query ChildQuery ChildSlot Aff
         locationToSlot l s =
           case l of
             Registration -> go CP.cp1 1 CR.component rs   (HE.input RegistrationMsg)
@@ -155,10 +157,10 @@ component =
             go :: forall g i o
              . CP.ChildPath g ChildQuery Int ChildSlot
             -> Int
-            -> H.Component HH.HTML g i o (Aff (LemmingPantsEffects e))
+            -> H.Component HH.HTML g i o Aff
             -> i
             -> (o -> Maybe (Query Unit))
-            -> H.ParentHTML Query ChildQuery ChildSlot (Aff (LemmingPantsEffects e))
+            -> H.ParentHTML Query ChildQuery ChildSlot Aff
             go cp p c i f = HH.slot' cp p c i f
 
             ls  = { token: s.token }
@@ -166,34 +168,35 @@ component =
             s'  = { token: s.token, agenda: s.agenda, attendees: s.attendees }
             ohs = { agenda: s.agenda, attendees: s.attendees }
 
-    eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (LemmingPantsEffects e))
+    eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void Aff
     eval =
       case _ of
         ChangePage l next ->
           H.modify (_ {currentLocation = l, flash = Nothing, showRegForm = true}) *> pure next
-        SignOut      next ->
-          H.liftAff removeToken *> pure next
+        SignOut      next -> do
+          s <- H.get
+          H.liftAff (removeToken s.window)
+          pure next
         AdminMsg   m next ->
           case m of
             CA.Flash s -> flash s next
         LoginMsg   m next ->
           case m of
-            CL.NewToken t ->
-              H.modify (_ {token = t})
-              *> H.liftAff (saveToken t)
-              *> pure next
+            CL.NewToken t -> do
+              s <- H.modify (_ {token = t})
+              H.liftAff (saveToken s.window t)
+              pure next
             CL.Flash s -> flash s next
         RegistrationMsg m next ->
           case m of
             CR.FrmVsbl b -> H.modify (\s -> s { showRegForm = b }) *> pure next
             CR.Flash   s -> flash s next
-        WSMsg s next ->
-          H.liftAff (log s)
-          *> H.get >>= (\state ->
-          case runExcept (dispatcher state =<< readJSON' s) of
+        WSMsg fr next -> do
+          liftEffect $ log $ unsafeFromForeign fr
+          state <- H.get
+          case runExcept (dispatcher state =<< read' fr) of
             Left  es -> flash (FL.mkFlash (foldMap renderForeignError es) FL.Error) next
             Right s' -> H.put s' *> pure next
-          )
       where
         flash s next =
           H.modify (_ {flash = Just s})

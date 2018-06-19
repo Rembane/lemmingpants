@@ -1,12 +1,11 @@
 module Components.Admin where
 
 import Components.SpeakerQueue as SQ
-import Control.Monad.Aff (Aff)
+import Effect.Aff (Aff)
 import Data.Either (Either(..), either, note)
 import Data.HTTP.Method (Method(..))
 import Data.List as L
 import Data.Maybe (Maybe(Nothing, Just))
-import Effects (LemmingPantsEffects)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -14,7 +13,7 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, id, map, pure, unit, ($), (*>), (<>), (==), (>>=))
+import Prelude (type (~>), Unit, bind, const, identity, map, pure, unit, ($), (*>), (<>), (==), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
@@ -37,16 +36,16 @@ data Query a
 data Message
   = Flash FL.Flash
 
-component :: forall e. H.Component HH.HTML Query Input Message (Aff (LemmingPantsEffects e))
+component :: H.Component HH.HTML Query Input Message Aff
 component =
   H.parentComponent
-    { initialState: id
+    { initialState: identity
     , render
     , eval
     , receiver: HE.input GotNewState
     }
   where
-    render :: State -> H.ParentHTML Query SQ.Query Unit (Aff (LemmingPantsEffects e))
+    render :: State -> H.ParentHTML Query SQ.Query Unit Aff
     render state =
       if pl.role == "admin_user"
         then
@@ -56,7 +55,7 @@ component =
               [ HH.button
                 [ HE.onClick (HE.input_ PreviousAI), HP.id_ "prev-button" ]
                 [ HH.text "⇐" ]
-              , HH.text (either id id (map (\(AgendaItem a) -> a.title) currentAI))
+              , HH.text (either identity identity (map (\(AgendaItem a) -> a.title) currentAI))
               , HH.button
                 [ HE.onClick (HE.input_ NextAI), HP.id_ "next-button" ]
                 [ HH.text "⇒" ]
@@ -94,7 +93,7 @@ component =
         currentAI    = AG.getCurrentAI state.agenda
         (Payload pl) = let (Token t) = state.token in t.payload
 
-    eval :: Query ~> H.ParentDSL State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e))
+    eval :: Query ~> H.ParentDSL State Query SQ.Query Unit Message Aff
     eval =
       case _ of
         PreviousAI next ->
@@ -108,7 +107,7 @@ component =
 
     step
       :: (Agenda -> Maybe Agenda)
-      -> H.HalogenM State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e)) Unit
+      -> H.HalogenM State Query SQ.Query Unit Message Aff Unit
     step f =
       H.get
         >>= \s ->
@@ -116,7 +115,7 @@ component =
 
     setCurrentAgendaItem
       :: Either String AgendaItem
-      -> H.HalogenM State Query SQ.Query Unit Message (Aff (LemmingPantsEffects e)) Unit
+      -> H.HalogenM State Query SQ.Query Unit Message Aff Unit
     setCurrentAgendaItem mai =
       case mai of
         Left s ->
