@@ -33,7 +33,7 @@ CREATE FUNCTION at_least_one_speaker_queue() RETURNS TRIGGER
             THEN
                 SELECT COUNT(*)
                 INTO active_speaker_queues
-                FROM speaker_queue
+                FROM model.speaker_queue
                 WHERE agenda_item_id = NEW.agenda_item_id
                 AND (state = 'init' OR state = 'active');
 
@@ -51,7 +51,7 @@ CREATE FUNCTION at_least_one_speaker_queue() RETURNS TRIGGER
     $$;
 
 CREATE TRIGGER at_least_one_speaker_queue
-    BEFORE UPDATE ON speaker_queue
+    BEFORE UPDATE ON model.speaker_queue
     FOR EACH ROW
     EXECUTE PROCEDURE at_least_one_speaker_queue();
 
