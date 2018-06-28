@@ -27,3 +27,6 @@ CREATE TYPE model.state AS ENUM ('init', 'active', 'done');
 
 -- Example data
 \i sql/example.sql
+
+-- Tests
+\i test.sql
