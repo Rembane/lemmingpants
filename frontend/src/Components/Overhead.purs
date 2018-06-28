@@ -8,7 +8,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (type (~>), Void, id, map, pure, ($), (*>), (<<<), (<>), (==))
+import Prelude (type (~>), Void, identity, map, pure, ($), (*>), (<<<), (<>), (==))
 import Types.Agenda (Agenda, AgendaItem(AgendaItem))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
@@ -26,7 +26,7 @@ data Query a = GotNewState Input a
 component :: forall m. H.Component HH.HTML Query Input Void m
 component =
   H.component
-    { initialState: id
+    { initialState: identity
     , render
     , eval
     , receiver: HE.input GotNewState

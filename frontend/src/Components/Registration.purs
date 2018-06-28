@@ -2,24 +2,24 @@ module Components.Registration where
 
 import Components.Forms as F
 import Components.Forms.Field (mkField)
-import Control.Monad.Aff (Aff)
 import Data.Either (Either(..))
-import Data.Foreign (MultipleErrors)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(Just), fromMaybe)
 import Data.Monoid (mempty)
-import Data.StrMap (delete, lookup)
 import Data.String (null)
-import Debug.Trace (traceA, traceAnyA)
-import Effects (LemmingPantsEffects)
+import Debug.Trace (traceM)
+import Effect.Aff (Aff)
+import Foreign (MultipleErrors)
+import Foreign.Object (delete, lookup)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Network.HTTP.Affjax.Response (string)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, discard, id, pure, unit, ($), (*>), (<$>), (<>))
+import Prelude (type (~>), Unit, bind, discard, identity, pure, unit, ($), (*>), (<$>), (<>))
 import Simple.JSON (readJSON)
 import Types.Flash as FL
 import Types.Token (Token)
@@ -38,16 +38,16 @@ data Message
   = Flash FL.Flash
   | FrmVsbl Boolean
 
-component :: forall e. H.Component HH.HTML Query Input Message (Aff (LemmingPantsEffects e))
+component :: H.Component HH.HTML Query Input Message Aff
 component =
   H.parentComponent
-    { initialState: id
+    { initialState: identity
     , render
     , eval
     , receiver
     }
   where
-    render :: State -> H.ParentHTML Query F.Query Unit (Aff (LemmingPantsEffects e))
+    render :: State -> H.ParentHTML Query F.Query Unit Aff
     render state =
       HH.div_
         [ HH.h1_ [HH.text "Registration"]
@@ -66,7 +66,7 @@ component =
             unit
             (HE.input FormMsg)
 
-    eval :: Query ~> H.HalogenM State Query F.Query Unit Message (Aff (LemmingPantsEffects e))
+    eval :: Query ~> H.HalogenM State Query F.Query Unit Message Aff
     eval =
       case _ of
         FormMsg m next -> do
@@ -77,7 +77,7 @@ component =
                           Just true -> delete "nick" m'
                           _         -> m'
               token <- H.gets (\s -> s.token)
-              r     <- H.liftAff (PG.signedInAjax (createURL "/rpc/create_attendee") token POST mempty m'')
+              r     <- H.liftAff (PG.signedInAjax (createURL "/rpc/create_attendee") token POST string mempty m'')
               case r.status of
                 StatusCode 200 -> do -- The `Created` HTTP status code.
                   H.raise (FrmVsbl false)
@@ -85,10 +85,10 @@ component =
                 StatusCode 409 -> do -- The `Conflict` HTTP status code.
                   -- Do we already have a person with the same number?
                   case parseError r.response of
-                    Left e   -> traceAnyA e
+                    Left e   -> traceM e
                     Right r' -> H.raise $ Flash $ FL.mkFlash ("ERROR: " <> r'.details) FL.Error
                 _ ->
-                  traceAnyA r *> traceA r.response
+                  traceM r *> traceM r.response
               pure next
 
         HandleInput mt next ->

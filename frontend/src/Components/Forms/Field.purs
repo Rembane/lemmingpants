@@ -13,7 +13,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (type (~>), Unit, Void, const, id, pure, (*>), (<$>), (<<<), (<>))
+import Prelude (type (~>), Unit, Void, const, identity, pure, (*>), (<$>), (<<<), (<>))
 
 data Query a
   = UpdateField String a
@@ -33,7 +33,7 @@ mkField
   -> FieldComponent m
 mkField name label props =
   H.component
-    { initialState: id
+    { initialState: identity
     , render
     , eval
     , receiver: const Nothing

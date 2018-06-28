@@ -4,6 +4,7 @@ CREATE VIEW agenda_item AS
     SELECT * FROM model.agenda_item;
 
 GRANT SELECT ON agenda_item TO read_access;
+GRANT INSERT ON agenda_item TO admin_user;
 
 -- Returns the id of the new current agenda item if things worked out well, 0 otherwise.
 CREATE FUNCTION set_current_agenda_item(id INTEGER) RETURNS INTEGER

@@ -1,0 +1,28 @@
+{
+    "name": "lemmingpants-frontend",
+    "set": "master",
+    "source": "https://github.com/purescript/package-sets.git",
+    "depends": [
+        "prelude",
+        "halogen",
+        "console",
+        "aff",
+        "affjax",
+        "errors",
+        "foreign-object",
+        "simple-json",
+        "routing",
+        "string-parsers",
+        "validation",
+        "now",
+        "generics-rep",
+        "debug",
+        "ordered-collections",
+        "psci-support",
+        "quickcheck",
+        "spec",
+        "spec-quickcheck",
+        "web-html",
+        "web-socket"
+    ]
+}

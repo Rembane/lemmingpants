@@ -14,7 +14,7 @@ import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.Newtype (class Newtype)
-import Data.Record (modify)
+import Record (modify)
 import Data.String (Pattern(..), split)
 import Data.Tuple (Tuple(..))
 import Prelude (class Eq, map, ($), (<#>), (<>), (>>=), (>>>))

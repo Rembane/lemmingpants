@@ -6,6 +6,10 @@ CREATE TABLE speaker_queue (
     state          state DEFAULT 'init' NOT NULL
 );
 
+REVOKE ALL ON speaker_queue FROM read_access, PUBLIC;
+GRANT INSERT (agenda_item_id, state) ON speaker_queue TO admin_user;
+GRANT UPDATE (state) ON speaker_queue TO admin_user;
+GRANT SELECT, REFERENCES ON speaker_queue TO read_access;
 GRANT USAGE ON speaker_queue_id_seq TO admin_user;
 
 -- Triggers -----------------------------------------------------------------
@@ -33,7 +37,7 @@ CREATE FUNCTION at_least_one_speaker_queue() RETURNS TRIGGER
             THEN
                 SELECT COUNT(*)
                 INTO active_speaker_queues
-                FROM speaker_queue
+                FROM model.speaker_queue
                 WHERE agenda_item_id = NEW.agenda_item_id
                 AND (state = 'init' OR state = 'active');
 
