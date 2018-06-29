@@ -16,6 +16,7 @@ services:
   lemmingpants:
     image: lemmingpants-backend:latest
     container_name: lemmingpants
+    restart: always
     ports:
       - "3000:3000"
     depends_on:
@@ -24,11 +25,13 @@ services:
   db:
     image: lemmingpants-db:latest
     container_name: db
+    restart: always
     ports:
       - "5432:5432"
     volumes:
       - ./docker/init.sh:/docker-entrypoint-initdb.d/init.sh
       - ./init.sql:/init.sql
+      - ./pg_tests:/pg_tests
       - ./sql:/sql
     environment:
       POSTGRES_USER: lemmingpants
@@ -37,6 +40,8 @@ services:
 
   ws:
     image: diogob/postgres-websockets
+    container_name: ws
+    restart: always
     environment:
       PGWS_DB_URI: postgres://lemmingpants:lemmingpants@db/lemmingpants
       PGWS_JWT_SECRET: "feBU1ykZ4icKs2nKam9l8CD84qhgeOl6QQakrUJBiRTUu4dKTLVoH8o"

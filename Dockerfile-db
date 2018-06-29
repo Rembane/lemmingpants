@@ -20,9 +20,12 @@ RUN make install
 # pgtap is the test framework used to test stored procedures
 # and other things. Quite useful when everything is based on a sound database.
 # You can get it here: https://github.com/theory/pgtap/
-#
-# We only install the Perl module here. The rest of the installation of pgtap
-# is done in docker/init.sh.
 RUN cpan TAP::Parser::SourceHandler::pgTAP
-
 RUN rm -rf /setup
+RUN git clone https://github.com/theory/pgtap/ /pgtap \
+  && cd /pgtap \
+  && make \
+  && make install \
+  # This might be a bad idea, consider solving this using
+  # by installing as normal user
+  && chmod -R 777 /pgtap
