@@ -1,4 +1,4 @@
-psql -d lemmingpants < /init.sql
+cd / && psql -d lemmingpants < /init.sql
 # Run pgtap tests
 cd /pgtap && make installcheck
 # Run application tests

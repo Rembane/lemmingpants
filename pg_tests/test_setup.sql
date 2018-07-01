@@ -11,4 +11,4 @@
 
 -- Load the TAP functions.
 BEGIN;
-\i /pgtap/sql/pgtap.sql
+\i pgtap.sql

@@ -2,15 +2,15 @@ version: '3'
 volumes:
   static:
 services:
-  lemmingpants-frontend:
-    image: lemmingpants-frontend:latest
-    container_name: lemmingpants-frontend
-    depends_on:
-      - db
-      - ws
-      - lemmingpants
-    volumes:
-      - static:/srv/static/
+#  lemmingpants-frontend:
+#    image: lemmingpants-frontend:latest
+#    container_name: lemmingpants-frontend
+#    depends_on:
+#      - db
+#      - ws
+#      - lemmingpants
+#    volumes:
+#      - static:/srv/static/
 
   # Postgrest
   lemmingpants:
