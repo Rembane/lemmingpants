@@ -51,6 +51,13 @@ BEGIN
     INSERT INTO model.agenda_item(id, supertitle, title, order_, state)
         VALUES(2, 'SUPER!', 'Just a title', 2, 'init');
 
+    RETURN NEXT row_eq('SELECT * FROM api.speaker_queue WHERE agenda_item_id=1',
+        ROW(1, 1, 'init')::speaker_queue,
+        'There is a speaker queue attached to the agenda item.');
+    RETURN NEXT row_eq('SELECT * FROM api.speaker_queue WHERE agenda_item_id=2',
+        ROW(2, 2, 'init')::speaker_queue,
+        'There is a speaker queue attached to the agenda item.');
+
     RETURN NEXT results_eq('SELECT api.set_current_agenda_item(1)', 'SELECT 1',
         'We can set current agenda item.');
     RETURN NEXT results_eq('SELECT state FROM api.agenda_item WHERE id=1', 'active_plan',
@@ -66,7 +73,38 @@ BEGIN
         'The previous agenda item is done.');
 
     RETURN NEXT throws_ok('SELECT api.set_current_agenda_item(3)', 'PT404',
-        'We throw error when we cant find an agenda item.');
+        'Cannot find agenda item.');
+END;
+$$;
+
+-- API: Attendees
+CREATE OR REPLACE FUNCTION testing.test_attendee_structure()
+RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
+BEGIN
+    RETURN NEXT has_view('api', 'attendee',
+        'The view api.attendee should exist.');
+    RETURN NEXT columns_are('api', 'attendee',
+        ARRAY['id', 'cid', 'name', 'nick', 'created']);
+    RETURN NEXT table_privs_are('api', 'attendee',
+        'read_access', ARRAY['SELECT']);
+    RETURN NEXT table_privs_are('api', 'attendee',
+        'admin_user', ARRAY['SELECT']);
+    RETURN NEXT has_view('api', 'attendee_number',
+        'The view api.attendee_number should exist.');
+    RETURN NEXT columns_are('api', 'attendee_number',
+        ARRAY['id', 'attendee_id', 'created']);
+    RETURN NEXT table_privs_are('api', 'attendee_number',
+        'read_access', ARRAY['SELECT']);
+    RETURN NEXT table_privs_are('api', 'attendee_number',
+        'admin_user', ARRAY['SELECT']);
+
+    RETURN NEXT function_privs_are('api', 'create_attendee',
+        ARRAY['integer', 'text', 'text', 'text'], 'read_access', ARRAY['EXECUTE']);
+
+    RETURN NEXT table_privs_are('model', 'attendee',
+        'admin_user', '{}', 'Not even an admin user should have access to the model table.');
+    RETURN NEXT table_privs_are('model', 'attendee_number',
+        'admin_user', '{}', 'Not even an admin user should have access to the model table.');
 END;
 $$;
 

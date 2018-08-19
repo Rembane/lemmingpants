@@ -18,6 +18,8 @@ CREATE TABLE attendee_number (
     created     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Whenever an attendee number is added, we send a message to the world
+-- containing the original attendee and its new number.
 CREATE FUNCTION attendee_number_news() RETURNS TRIGGER
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = model, public, pg_temp
   AS $$
