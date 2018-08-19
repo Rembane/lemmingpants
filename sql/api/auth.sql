@@ -24,9 +24,10 @@ GRANT EXECUTE ON FUNCTION login(username TEXT, password TEXT) TO read_access;
 -- Get token with permissions of web_anon.
 -- Useful for websockets.
 CREATE FUNCTION api.get_token() RETURNS jwt_token
-  LANGUAGE sql SECURITY DEFINER SET search_path = api, model, public, pg_temp
+  LANGUAGE sql SECURITY DEFINER SET search_path = model, public, pg_temp
   AS $$
-    SELECT sign(json_build_object('role', 'web_anon', 'exp', extract(EPOCH FROM NOW())::INTEGER + 86400, 'mode', 'r'),
+    SELECT sign(json_build_object('role', 'web_anon', 'exp',
+            extract(EPOCH FROM NOW())::INTEGER + 86400, 'mode', 'r'),
         current_setting('app.jwt_secret')) AS token;
   $$;
 

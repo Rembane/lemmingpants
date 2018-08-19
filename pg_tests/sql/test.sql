@@ -108,4 +108,22 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION testing.test_attendee_functions()
+RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
+BEGIN
+    RETURN NEXT lives_ok('SELECT api.create_attendee(1, ''CID'', ''name'', ''witty nickname'')',
+        'We can create an attendee.');
+    RETURN NEXT results_eq('SELECT cid FROM api.attendee', 'SELECT ''cid''',
+        'create_attendee lowercases the CIDs.');
+    RETURN NEXT results_eq('SELECT id FROM api.attendee_number WHERE attendee_id=1',
+        Array[1],
+        'Exactly one attendee_number is created for our attendee.');
+    RETURN NEXT lives_ok('SELECT api.create_attendee(2, ''CID'', ''name'', ''witty nickname'')',
+        'We can create the same attendee again, using the same CID.');
+    RETURN NEXT results_eq('SELECT id FROM api.attendee_number WHERE attendee_id=1',
+        Array[1, 2],
+        'Exactly two attendee_numbers is created for our attendee.');
+END;
+$$;
+
 SELECT * FROM runtests('testing'::name);
