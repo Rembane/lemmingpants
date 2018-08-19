@@ -16,7 +16,7 @@ BEGIN
 END;
 $$;
 
--- API: Agenda item tests
+-- Agenda item tests
 CREATE OR REPLACE FUNCTION testing.test_agenda_item_structure()
 RETURNS SETOF TEXT LANGUAGE plpgsql AS $$
 BEGIN
@@ -77,7 +77,7 @@ BEGIN
 END;
 $$;
 
--- API: Attendees
+-- Attendees
 CREATE OR REPLACE FUNCTION testing.test_attendee_structure()
 RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
 BEGIN
@@ -123,6 +123,54 @@ BEGIN
     RETURN NEXT results_eq('SELECT id FROM api.attendee_number WHERE attendee_id=1',
         Array[1, 2],
         'Exactly two attendee_numbers is created for our attendee.');
+END;
+$$;
+
+-- Auth
+CREATE OR REPLACE FUNCTION testing.test_auth()
+RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
+BEGIN
+    RETURN NEXT has_type('api', 'jwt_token', 'Is jwt_token there as it should be?');
+    RETURN NEXT has_function('api', 'login', ARRAY['text', 'text']);
+    RETURN NEXT function_privs_are('api', 'login',
+        ARRAY['text', 'text'], 'read_access', ARRAY['EXECUTE']);
+    RETURN NEXT has_function('api', 'get_token', '{}');
+    RETURN NEXT function_privs_are('api', 'get_token',
+        '{}', 'read_access', ARRAY['EXECUTE']);
+
+    RETURN NEXT has_table('model'::name, 'users'::name);
+    RETURN NEXT columns_are('model', 'users', ARRAY['username', 'password', 'role']);
+    RETURN NEXT col_is_pk('model', 'users', 'username',
+        'The username column is primary key.');
+    RETURN NEXT table_privs_are('model', 'users',
+        'read_access', '{}', 'Noone should have access to the users table.');
+    RETURN NEXT table_privs_are('model', 'users',
+        'admin_user', '{}', 'Noone should have access to the users table.');
+    RETURN NEXT table_privs_are('model', 'users',
+        'lemmingpants', '{}', 'Noone should have access to the users table.');
+
+    RETURN NEXT lives_ok('INSERT INTO model.users(username, password, role) VALUES(''testbob'', ''bestpassword'', ''read_access'')',
+        'We should be able to create a user.');
+    RETURN NEXT results_eq('SELECT username FROM model.users WHERE username=''testbob''',
+        ARRAY['testbob'],
+        'We should be able to get a user by username.'
+        );
+    RETURN NEXT results_ne('SELECT password FROM model.users WHERE username=''testbob''',
+        ARRAY['bestpassword'],
+        'The password should be scrambled.'
+        );
+    RETURN NEXT throws_ok('INSERT INTO model.users(username, password, role) VALUES(''bob2'', ''bestpassword'', ''norol'')',
+        '23503',
+        'Unknown database role: norol',
+        'We should get an error message if the database role doesnt exist.');
+    SET SESSION app.jwt_secret = 'secret';
+    RETURN NEXT lives_ok('SELECT api.login(''testbob'', ''bestpassword'')',
+        'We should be able to login.');
+    RETURN NEXT throws_ok('SELECT api.login(''testbob'', ''worstpassword'')', 'PT404',
+        'Cannot find user.',
+        'Wrong password should not give us access.');
+    RETURN NEXT lives_ok('SELECT api.get_token()',
+        'We should be able to get an anonymous token.');
 END;
 $$;
 
