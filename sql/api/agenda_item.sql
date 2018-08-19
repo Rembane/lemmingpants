@@ -17,7 +17,10 @@ CREATE FUNCTION set_current_agenda_item(id INTEGER) RETURNS INTEGER
             UPDATE agenda_item SET state='active' WHERE agenda_item.id=set_current_agenda_item.id RETURNING agenda_item.id INTO n;
             RETURN n;
         ELSE
-            RETURN 0;
+            RAISE sqlstate 'PT404' USING
+                message = 'Cannot find agenda item.',
+                detail = 'Agenda item with id' || (set_current_agenda_item.id :: text),
+                hint = 'Use an id for an agenda item that exists.';
         END IF;
     END
     $$;
