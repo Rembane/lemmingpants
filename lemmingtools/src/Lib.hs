@@ -80,7 +80,7 @@ untilCommentOrEOL
 
 -- | Some SQL shenanigans
 insertionQuery :: Query
-insertionQuery = "INSERT INTO agenda_item(supertitle, title) VALUES(?, ?)"
+insertionQuery = "INSERT INTO model.agenda_item(supertitle, title) VALUES(?, ?)"
 
 punktToSQL :: Punkt -> [(Maybe Text, Text)]
 punktToSQL (Punkt t us)

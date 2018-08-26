@@ -24,10 +24,9 @@ import Data.Lens (Lens', element, lens, over, preview, traverseOf, traversed)
 import Data.List as L
 import Data.Maybe (Maybe, fromJust, fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Record as R
-import Data.Record.ShowRecord (showRecord)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Eq, class Ord, class Show, compare, const, ($), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>>>))
+import Prelude (class Eq, class Ord, class Show, compare, const, show, ($), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>>>))
+import Record as R
 import Simple.JSON (class ReadForeign, readImpl)
 import Type.Prelude (SProxy(..))
 import Types.Lens (_withId)
@@ -48,7 +47,7 @@ derive instance ntAI :: Newtype AgendaItem _
 derive instance eqAI :: Eq      AgendaItem
 
 instance shAI :: Show AgendaItem where
-  show (AgendaItem ai) = "AgendaItem " <> showRecord ai
+  show (AgendaItem ai) = "AgendaItem " <> show ai
 
 instance ordAI :: Ord AgendaItem where
   compare (AgendaItem a1) (AgendaItem a2) =

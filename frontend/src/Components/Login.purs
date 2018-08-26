@@ -2,23 +2,23 @@ module Components.Login where
 
 import Components.Forms as F
 import Components.Forms.Field (mkField)
-import Control.Monad.Aff (Aff)
 import Data.Array as A
 import Data.Either (Either(..), note)
 import Data.Foldable (foldMap)
-import Data.Foreign (Foreign, ForeignError(..), MultipleErrors, renderForeignError)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(Nothing))
-import Effects (LemmingPantsEffects)
+import Effect.Aff (Aff)
+import Foreign (ForeignError(..), MultipleErrors, renderForeignError)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax as AX
+import Network.HTTP.Affjax.Response (string)
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, discard, id, pure, unit, ($), (*>), (<<<), (>>=))
-import Simple.JSON (read)
+import Prelude (type (~>), Unit, bind, const, discard, identity, pure, unit, ($), (*>), (<<<), (>>=))
+import Simple.JSON (readJSON)
 import Types.Flash as FL
 import Types.Token (Token, parseToken)
 
@@ -32,16 +32,16 @@ data Message
   | Flash    FL.Flash
 
 
-component :: forall e. H.Component HH.HTML Query State Message (Aff (LemmingPantsEffects e))
+component :: H.Component HH.HTML Query State Message Aff
 component =
   H.parentComponent
-    { initialState: id
+    { initialState: identity
     , render
     , eval
     , receiver: const Nothing
     }
   where
-    render :: State -> H.ParentHTML Query F.Query Unit (Aff (LemmingPantsEffects e))
+    render :: State -> H.ParentHTML Query F.Query Unit Aff
     render state =
       HH.div_
         [ HH.h1_ [HH.text "Login"]
@@ -56,7 +56,7 @@ component =
             (HE.input FormMsg)
         ]
 
-    eval :: Query ~> H.HalogenM State Query F.Query Unit Message (Aff (LemmingPantsEffects e))
+    eval :: Query ~> H.HalogenM State Query F.Query Unit Message Aff
     eval =
       case _ of
         FormMsg m next ->
@@ -67,7 +67,7 @@ component =
               -- loading the page so they can connect to the websocket
               -- server.
               token <- H.gets (\s -> s.token)
-              r <- H.liftAff $ PG.signedInAjax (createURL "/rpc/login") token POST [] m'
+              r <- H.liftAff $ PG.signedInAjax (createURL "/rpc/login") token POST string [] m'
               case result r of
                 Left  es -> H.raise $ Flash $ FL.mkFlash (foldMap renderForeignError es) FL.Error
                 Right t  -> (H.raise $ NewToken t)
@@ -75,10 +75,10 @@ component =
               pure next
 
       where
-        pt :: Foreign -> Either MultipleErrors (Array { token :: String })
-        pt = read
+        pt :: String -> Either MultipleErrors (Array { token :: String })
+        pt = readJSON
 
-        result :: AX.AffjaxResponse Foreign -> Either MultipleErrors Token
+        result :: AX.AffjaxResponse String -> Either MultipleErrors Token
         result r =
           pt r.response
             >>= note (pure $ ForeignError "Expected array with length >0, got something else... from: /rpc/login") <<< A.head

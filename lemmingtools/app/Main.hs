@@ -48,6 +48,7 @@ main = do
       connectPostgreSQL (optDBURL cfg)
         >>= \c ->
           withTransaction c
-            (execute_ c "SET SCHEMA 'api'"
+            (execute_ c "SET SCHEMA 'model'"
+              *> execute_ c "SET ROLE 'admin_user'"
               *> executeMany c insertionQuery (concatMap punktToSQL ps))
         >>= print

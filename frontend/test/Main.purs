@@ -1,17 +1,17 @@
 module Test.Main where
 
-import Control.Monad.Eff (Eff)
+import Effect (Effect)
 import Data.Array as A
-import Data.Either (Either(Left, Right))
+import Data.Either (Either(..))
 import Data.Lens (over)
 import Data.Maybe (Maybe(Nothing, Just), fromJust)
 import Partial.Unsafe (unsafePartial)
-import Prelude (Unit, discard, id, otherwise, show, unit, ($), (&&), (<), (<=), (<>), (==), (||))
+import Prelude (Unit, discard, identity, otherwise, show, unit, ($), (&&), (<), (<=), (<>), (==), (||))
 import Simple.JSON (readJSON)
 import Test.QuickCheck (Result(Success, Failed))
 import Test.Spec (describe, it)
 import Test.Spec.Assertions (shouldEqual)
-import Test.Spec.QuickCheck (QCRunnerEffects, quickCheck)
+import Test.Spec.QuickCheck (quickCheck)
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (run)
 import Types.Speaker as S
@@ -48,7 +48,7 @@ speakersAreSortedCorrectly ss
 
 theSpeakersLensRespectsInvariants :: SpeakerQueue -> Result
 theSpeakersLensRespectsInvariants sq@(SpeakerQueue sqr)
-  = let sq'@(SpeakerQueue sqr') = over _Speakers id sq
+  = let sq'@(SpeakerQueue sqr') = over _Speakers identity sq
      in case A.head sqr.speakers of
           Just s@(S.Speaker sr) ->
             let ss' = A.filter (\(S.Speaker s1) -> s1.state == S.Deleted || s1.state == S.Done) sqr'.speakers
@@ -58,7 +58,7 @@ theSpeakersLensRespectsInvariants sq@(SpeakerQueue sqr)
 
           Nothing -> Success
 
-main :: Eff (QCRunnerEffects ()) Unit
+main :: Effect Unit
 main = run [consoleReporter] do
   describe "Speakers" do
     they "are sorted correctly" $ quickCheck speakersAreSortedCorrectly
