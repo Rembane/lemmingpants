@@ -58,15 +58,13 @@ BEGIN
         ROW(2, 2, 'init')::speaker_queue,
         'There is a speaker queue attached to the agenda item.');
 
-    RETURN NEXT results_eq('SELECT api.set_current_agenda_item(1)', 'SELECT 1',
-        'We can set current agenda item.');
+    PERFORM api.set_current_agenda_item(1);
     RETURN NEXT results_eq('SELECT state FROM api.agenda_item WHERE id=1', 'active_plan',
         'The current agenda item is active.');
     RETURN NEXT results_eq('SELECT state FROM api.agenda_item WHERE id=2', 'init_plan',
         'The next agenda item is init.');
 
-    RETURN NEXT results_eq('SELECT api.set_current_agenda_item(2)', 'SELECT 2',
-        'We can set current agenda item.');
+    PERFORM api.set_current_agenda_item(2);
     RETURN NEXT results_eq('SELECT state FROM api.agenda_item WHERE id=2', 'active_plan',
         'The current agenda item is active.');
     RETURN NEXT results_eq('SELECT state FROM api.agenda_item WHERE id=1', 'done_plan',

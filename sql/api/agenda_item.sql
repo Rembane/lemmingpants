@@ -6,22 +6,23 @@ CREATE VIEW agenda_item AS
 GRANT SELECT ON agenda_item TO read_access;
 GRANT INSERT ON agenda_item TO admin_user;
 
--- Returns the id of the new current agenda item if things worked out well, 0 otherwise.
-CREATE FUNCTION set_current_agenda_item(id INTEGER) RETURNS INTEGER
+CREATE FUNCTION set_current_agenda_item(id INTEGER) RETURNS VOID
     LANGUAGE plpgsql SECURITY DEFINER SET search_path = model, public, pg_temp
     AS $$
     DECLARE
-        n INTEGER = 0;
+        aid INTEGER;
     BEGIN
-        IF EXISTS(SELECT 1 FROM agenda_item WHERE agenda_item.id=set_current_agenda_item.id) THEN
-            UPDATE agenda_item SET state='done' WHERE state='active';
-            UPDATE agenda_item SET state='active' WHERE agenda_item.id=set_current_agenda_item.id RETURNING agenda_item.id INTO n;
-            RETURN n;
-        ELSE
+        SELECT agenda_item.id INTO aid FROM agenda_item
+            WHERE agenda_item.id=set_current_agenda_item.id;
+        IF aid IS NULL THEN
             RAISE sqlstate 'PT404' USING
                 message = 'Cannot find agenda item.',
                 detail = 'Agenda item with id' || (set_current_agenda_item.id :: text),
                 hint = 'Use an id for an agenda item that exists.';
+        ELSE
+            UPDATE agenda_item SET state='done' WHERE state='active';
+            UPDATE agenda_item SET state='active'
+                WHERE agenda_item.id=aid;
         END IF;
     END
     $$;

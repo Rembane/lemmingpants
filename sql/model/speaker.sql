@@ -14,10 +14,11 @@ CREATE TABLE speaker (
     created          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 -- At most one speaker per queue may be active at the same time.
-CREATE UNIQUE INDEX ON speaker (speaker_queue_id, state) where state='active';
+CREATE UNIQUE INDEX ON speaker (speaker_queue_id) WHERE state='active';
 
--- At most one speaker per queue may be init or active at the same time.
-CREATE UNIQUE INDEX ON speaker (speaker_queue_id, attendee_id) where state IN ('active', 'init');
+-- At most one speaker per queue and attendee may be init or active at the same time.
+-- That is, you must speak before you add yourself to the queue again.
+CREATE UNIQUE INDEX ON speaker (speaker_queue_id, attendee_id) WHERE state IN ('active', 'init');
 
 GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user;
 
