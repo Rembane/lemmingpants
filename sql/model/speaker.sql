@@ -19,17 +19,14 @@ CREATE UNIQUE INDEX ON speaker (speaker_queue_id, state) where state='active';
 -- At most one speaker per queue may be init or active at the same time.
 CREATE UNIQUE INDEX ON speaker (speaker_queue_id, attendee_id) where state IN ('active', 'init');
 
--- GRANT SELECT, REFERENCES ON speaker TO read_access;
--- GRANT INSERT (speaker_queue_id, attendee_id, state) ON speaker TO admin_user;
--- GRANT UPDATE (state) ON speaker TO admin_user;
--- GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user;
+GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user;
 
 -- This is websocket_news() on steroids.
 -- It does a join with active_speakers to give us the data we want
 -- instead of the data we have, thus breaking the pattern the other
 -- triggers follow.
 CREATE FUNCTION speaker_news() RETURNS TRIGGER
-    LANGUAGE plpgsql SECURITY DEFINER SET search_path = model, public, pg_temp
+    LANGUAGE plpgsql SECURITY DEFINER SET search_path = model, api, public, pg_temp
     AS $$
     DECLARE
       j json;
@@ -38,7 +35,7 @@ CREATE FUNCTION speaker_news() RETURNS TRIGGER
         FROM (
             SELECT s.id, s.speaker_queue_id, s.attendee_id, s.state, a.times_spoken, sq.agenda_item_id
             FROM speaker AS s
-            LEFT JOIN active_speakers AS a
+            LEFT JOIN api.active_speakers AS a
             ON s.id = a.id
             LEFT JOIN speaker_queue AS sq
             ON s.speaker_queue_id = sq.id

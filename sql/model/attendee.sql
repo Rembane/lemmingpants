@@ -3,9 +3,6 @@ SET SCHEMA 'model';
 -- Note: That if you ever let people update their cids or insert new cids
 --       from another vector than create_attendee then you _need_ to
 --       lowercase the cid.
---
--- TODO: If you are really bored, remove create_attendee and create some
---       triggers instead. It'll be fun, I promise!
 CREATE TABLE attendee (
     id      SERIAL PRIMARY KEY,
     cid     TEXT NOT NULL UNIQUE,
@@ -15,7 +12,7 @@ CREATE TABLE attendee (
 );
 
 CREATE TABLE attendee_number (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY,
     attendee_id INTEGER REFERENCES attendee NOT NULL,
     created     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

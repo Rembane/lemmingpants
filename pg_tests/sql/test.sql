@@ -174,4 +174,27 @@ BEGIN
 END;
 $$;
 
+-- Speakers
+CREATE OR REPLACE FUNCTION testing.test_speaker()
+RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
+DECLARE
+    aid INTEGER;
+BEGIN
+    INSERT INTO model.agenda_item(title, order_) VALUES('THIS IS A TITLE', 1);
+    PERFORM api.create_attendee(1, 'CID', 'name', 'witty nickname');
+    INSERT INTO model.speaker_queue(id, agenda_item_id) VALUES(1, 1);
+    SELECT api.attendee.id INTO aid
+        FROM api.attendee
+        JOIN api.attendee_number
+        ON api.attendee.id = api.attendee_number.attendee_id
+        WHERE api.attendee_number.id = 1;
+    INSERT INTO model.speaker(speaker_queue_id, attendee_id) VALUES(1, aid);
+    RETURN NEXT lives_ok('SELECT api.set_current_speaker(1)',
+        'We should be able to set the current speaker.');
+    RETURN NEXT results_eq('SELECT state FROM api.speaker WHERE id=1',
+        ARRAY['active'::speaker_state],
+        'The state should now be active.');
+END;
+$$;
+
 SELECT * FROM runtests('testing'::name);

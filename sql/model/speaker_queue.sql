@@ -35,7 +35,7 @@ CREATE FUNCTION at_least_one_speaker_queue() RETURNS TRIGGER
     BEGIN
         IF NEW.state = 'done'
             THEN
-                SELECT COUNT(*)
+                SELECT COUNT(id)
                 INTO active_speaker_queues
                 FROM model.speaker_queue
                 WHERE agenda_item_id = NEW.agenda_item_id
@@ -65,13 +65,11 @@ CREATE FUNCTION check_if_top_speakerqueue() RETURNS TRIGGER
     DECLARE
         has_greater_friends BOOLEAN;
     BEGIN
-        SELECT COUNT(sq2.id) > 0 INTO STRICT has_greater_friends
-            FROM speaker_queue AS sq1
-            JOIN speaker_queue AS sq2
-            ON sq2.state = 'active'
-            AND sq2.id > OLD.id
-            AND sq1.agenda_item_id = sq2.agenda_item_id
-            WHERE sq1.id = OLD.id;
+        SELECT COUNT(id) > 0 INTO has_greater_friends
+            FROM speaker_queue
+            WHERE id > OLD.id
+            AND agenda_item_id = OLD.agenda_item_id
+            AND state = 'active';
 
         IF has_greater_friends
             THEN

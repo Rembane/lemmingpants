@@ -30,24 +30,26 @@ CREATE VIEW active_speakers AS
 
 GRANT SELECT, REFERENCES ON active_speakers TO read_access;
 
--- Returns the id of the new current speaker if things worked out well, 0 otherwise.
+-- Returns the id of the new current speaker if things worked out well.
 CREATE FUNCTION set_current_speaker(id INTEGER) RETURNS INTEGER
     LANGUAGE plpgsql SECURITY DEFINER SET search_path = api, model, public, pg_temp
     AS $$
     DECLARE
-        n    INTEGER = 0;
-        sqid INTEGER = 0;
+        s speaker;
     BEGIN
-        IF EXISTS(SELECT 1 FROM speaker WHERE speaker.id=set_current_speaker.id) THEN
-            SELECT speaker_queue_id INTO sqid FROM speaker WHERE speaker.id = set_current_speaker.id;
-            UPDATE speaker SET state='done'
-                WHERE speaker.speaker_queue_id = sqid
-                AND state='active';
-            UPDATE speaker SET state='active' WHERE speaker.id=set_current_speaker.id
-            RETURNING speaker.id INTO n;
-            RETURN n;
+        SELECT * INTO s
+            FROM speaker WHERE speaker.id = set_current_speaker.id;
+        IF s IS NULL THEN
+            RAISE sqlstate 'PT404' USING
+                message = 'Cannot find speaker.',
+                detail = 'There is no speaker with that id.',
+                hint = 'Try an id that exists.';
         ELSE
-            RETURN 0;
+            UPDATE speaker SET state='done'
+                WHERE speaker.speaker_queue_id = s.speaker_queue_id
+                AND state='active';
+            UPDATE speaker SET state='active' WHERE speaker.id=set_current_speaker.id;
+            RETURN s.id;
         END IF;
     END
     $$;
