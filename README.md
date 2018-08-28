@@ -22,6 +22,8 @@ For development you should be good to go if you install the programs below:
   SassC are used in development, so if you use them it should just work.
   https://sass-lang.com/libsass
 - Purescript >= 0.12.0
+- pulp: https://github.com/purescript-contrib/pulp a recent version, otherwise you
+  will get scary error messages.
 
 ### Initialize the database
 
