@@ -3,6 +3,7 @@ module Components.Login where
 import Components.Forms as F
 import Components.Forms.Field (mkField)
 import Data.Array as A
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..), note)
 import Data.Foldable (foldMap)
 import Data.HTTP.Method (Method(..))
@@ -13,8 +14,8 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Network.HTTP.Affjax as AX
-import Network.HTTP.Affjax.Response (string)
+import Affjax as AX
+import Affjax.ResponseFormat as Res
 import Postgrest (createURL)
 import Postgrest as PG
 import Prelude (type (~>), Unit, bind, const, discard, identity, pure, unit, ($), (*>), (<<<), (>>=))
@@ -67,7 +68,7 @@ component =
               -- loading the page so they can connect to the websocket
               -- server.
               token <- H.gets (\s -> s.token)
-              r <- H.liftAff $ PG.signedInAjax (createURL "/rpc/login") token POST string [] m'
+              r <- H.liftAff $ PG.signedInAjax (createURL "/rpc/login") token POST Res.string [] m'
               case result r of
                 Left  es -> H.raise $ Flash $ FL.mkFlash (foldMap renderForeignError es) FL.Error
                 Right t  -> (H.raise $ NewToken t)
@@ -78,8 +79,9 @@ component =
         pt :: String -> Either MultipleErrors (Array { token :: String })
         pt = readJSON
 
-        result :: AX.AffjaxResponse String -> Either MultipleErrors Token
-        result r =
-          pt r.response
+        result :: AX.Response (Either AX.ResponseFormatError String) -> Either MultipleErrors Token
+        result {body} =
+          lmap (pure <<< ForeignError <<< Res.printResponseFormatError) body
+            >>= pt
             >>= note (pure $ ForeignError "Expected array with length >0, got something else... from: /rpc/login") <<< A.head
             >>= \t -> parseToken t.token

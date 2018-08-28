@@ -4,6 +4,7 @@
     "source": "https://github.com/purescript/package-sets.git",
     "depends": [
         "prelude",
+        "arrays",
         "halogen",
         "console",
         "aff",

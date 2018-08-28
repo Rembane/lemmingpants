@@ -1,25 +1,26 @@
 module Components.Registration where
 
+import Affjax.ResponseFormat as Res
+import Affjax.StatusCode (StatusCode(..))
 import Components.Forms as F
 import Components.Forms.Field (mkField)
-import Data.Either (Either(..))
+import Data.Bifunctor
+import Data.Either (Either, either)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(Just), fromMaybe)
 import Data.Monoid (mempty)
 import Data.String (null)
 import Debug.Trace (traceM)
 import Effect.Aff (Aff)
-import Foreign (MultipleErrors)
+import Foreign (ForeignError(..), MultipleErrors)
 import Foreign.Object (delete, lookup)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Network.HTTP.Affjax.Response (string)
-import Network.HTTP.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, discard, identity, pure, unit, ($), (*>), (<$>), (<>))
+import Prelude (type (~>), Unit, bind, discard, identity, pure, unit, ($), (*>), (<$>), (<<<), (<>), (=<<))
 import Simple.JSON (readJSON)
 import Types.Flash as FL
 import Types.Token (Token)
@@ -77,18 +78,19 @@ component =
                           Just true -> delete "nick" m'
                           _         -> m'
               token <- H.gets (\s -> s.token)
-              r     <- H.liftAff (PG.signedInAjax (createURL "/rpc/create_attendee") token POST string mempty m'')
-              case r.status of
+              {status, body} <- H.liftAff (PG.signedInAjax (createURL "/rpc/create_attendee") token POST Res.string mempty m'')
+              case status of
                 StatusCode 200 -> do -- The `Created` HTTP status code.
                   H.raise (FrmVsbl false)
                   *> (H.raise $ Flash $ FL.mkFlash ("Thank you for registering, " <> fromMaybe "ERROR! EXTERMINATE!" (lookup "name" m')) FL.Info)
                 StatusCode 409 -> do -- The `Conflict` HTTP status code.
                   -- Do we already have a person with the same number?
-                  case parseError r.response of
-                    Left e   -> traceM e
-                    Right r' -> H.raise $ Flash $ FL.mkFlash ("ERROR: " <> r'.details) FL.Error
+                  either
+                    traceM
+                    (\{details} -> H.raise $ Flash $ FL.mkFlash ("ERROR: " <> details) FL.Error)
+                    (parseError =<< lmap (pure <<< ForeignError <<< Res.printResponseFormatError) body)
                 _ ->
-                  traceM r *> traceM r.response
+                  traceM status *> traceM body
               pure next
 
         HandleInput mt next ->

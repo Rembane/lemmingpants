@@ -9,20 +9,19 @@ module Postgrest
 
 -- | Here we keep the functions to make our interactions with Postgrest a breeze.
 
+import Affjax as AX
+import Affjax.RequestHeader (RequestHeader(..))
+import Affjax.RequestBody as Req
+import Affjax.ResponseFormat as Res
 import Data.Array as A
-import Data.Either (Either(..), note)
+import Data.Either (Either(..), either, note)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(Just))
 import Data.MediaType (MediaType(..))
 import Data.Monoid (mempty)
 import Effect.Aff (Aff)
 import Foreign (ForeignError(..), MultipleErrors)
-import Network.HTTP.Affjax (URL)
-import Network.HTTP.Affjax as AX
-import Network.HTTP.Affjax.Request as Req
-import Network.HTTP.Affjax.Response as Res
-import Network.HTTP.RequestHeader (RequestHeader(..))
-import Prelude (pure, ($), (<#>), (<>), (>>=), (>>>))
+import Prelude (Unit, pure, ($), (<#>), (<>), (>>=), (>>>), (<<<))
 import Simple.JSON (class WriteForeign, readJSON, writeJSON)
 import Types.Token (Token(..), parseToken)
 
@@ -36,8 +35,8 @@ createWSURL :: String -> String
 createWSURL = (<>) wsUrlPrefix
 
 pgrequest
-  :: URL
-  -> AX.AffjaxRequest
+  :: AX.URL
+  -> AX.Request Unit
 pgrequest url =
   AX.defaultRequest
     { url     = url
@@ -53,36 +52,43 @@ useToken (Token t) = RequestHeader "Authorization" ("Bearer " <> t.raw)
 signedInAjax
   :: forall a i
   .  WriteForeign i
-  => URL
+  => AX.URL
   -> Token
   -> Method
-  -> Res.Response a
+  -> Res.ResponseFormat a
   -> Array RequestHeader
   -> i
-  -> Aff (AX.AffjaxResponse a)
+  -> Aff (AX.Response (Either AX.ResponseFormatError a))
 signedInAjax url token method r hs d =
-  let pg' = (pgrequest url) { content = Just (Req.string $ writeJSON d) }
-   in AX.affjax r (pg' { headers = pg'.headers <> [useToken token] <> hs, method = Left method })
+  let pg' = pgrequest url
+   in AX.request (pg' { headers        = pg'.headers <> [useToken token] <> hs
+                      , method         = Left method
+                      , content        = Just $ Req.string $ writeJSON d
+                      , responseFormat = r
+                      })
 
 emptyResponse
   :: forall i
    . WriteForeign i
-  => URL
+  => AX.URL
   -> Token
   -> Method
   -> i
-  -> Aff (AX.AffjaxResponse String)
-emptyResponse url token m d = signedInAjax url token m (Res.string) mempty d
+  -> Aff (AX.Response (Either AX.ResponseFormatError String))
+emptyResponse url token m d = signedInAjax url token m Res.string mempty d
 
 -- | Request a new, anonymous token
 requestAnonymousToken :: Aff (Either MultipleErrors Token)
 requestAnonymousToken =
-  AX.affjax Res.string ((pgrequest (createURL "/rpc/get_token")) { method = Left POST })
-  <#> \{response} ->
-    pt response
-    >>= (A.head
-       >>> note (pure (ForeignError "No first item in array found.")))
-    >>= \t -> parseToken t.token
+  AX.request ((pgrequest (createURL "/rpc/get_token")) { method = Left POST, responseFormat = Res.string })
+  <#> \{body} ->
+    either
+      (Left <<< pure <<< ForeignError <<< Res.printResponseFormatError)
+      (\s -> pt s
+        >>= (A.head >>> note (pure (ForeignError "No first item in array found.")))
+        >>= \t -> parseToken t.token
+      )
+      body
   where
     pt :: String -> Either MultipleErrors (Array { token :: String })
     pt = readJSON

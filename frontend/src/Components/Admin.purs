@@ -10,7 +10,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Network.HTTP.StatusCode (StatusCode(..))
+import Affjax.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
 import Prelude (type (~>), Unit, bind, const, identity, map, pure, unit, ($), (*>), (<>), (==), (>>=))

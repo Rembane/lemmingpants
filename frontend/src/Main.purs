@@ -1,7 +1,9 @@
 module Main where
 
+import Affjax as AX
+import Affjax.ResponseFormat as Res
 import Control.Apply (lift3)
-import Data.Bifunctor (rmap)
+import Data.Bifunctor (lmap, rmap)
 import Data.DateTime.Instant (instant)
 import Data.Either (Either(Right, Left), either)
 import Data.Foldable (foldMap)
@@ -15,15 +17,13 @@ import Effect.Aff (Aff, launchAff_, parallel, sequential)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Effect.Now (now)
-import Foreign (MultipleErrors, renderForeignError)
+import Foreign (ForeignError(..), MultipleErrors, renderForeignError)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
 import Lemmingpants as LP
-import Network.HTTP.Affjax as AX
-import Network.HTTP.Affjax.Response as Res
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, discard, pure, unit, void, ($), (*), (*>), (<#>), (<$>), (<*>), (<<<), (<>), (>), (>>=))
+import Prelude (type (~>), Unit, bind, const, discard, pure, unit, void, ($), (*), (*>), (<#>), (<$>), (<*>), (<<<), (<>), (>), (>>=), (=<<))
 import Routing.Hash (matches)
 import Simple.JSON (readJSON)
 import Types.Agenda (Agenda)
@@ -42,6 +42,9 @@ parseAgenda = readJSON
 parseAttendees :: String -> Either MultipleErrors (Array Attendee)
 parseAttendees = readJSON
 
+convertErrors :: forall a. Either Res.ResponseFormatError a -> Either MultipleErrors a
+convertErrors = lmap (pure <<< ForeignError <<< Res.printResponseFormatError)
+
 combineFailures
   :: forall a b c
    . Either MultipleErrors a
@@ -59,9 +62,9 @@ loadInitialState :: Aff (Either MultipleErrors LP.Input)
 loadInitialState = do
   w <- liftEffect window
   sequential
-    (combineFailures <$>                                        parallel (loadOrGetNewToken w)
-                     <*> ((\r -> parseAgenda    r.response) <$> parallel (getString initialAgendaUrl))
-                     <*> ((\r -> parseAttendees r.response) <$> parallel (getString initialAttendeesUrl)))
+    (combineFailures <$>                                       parallel (loadOrGetNewToken w)
+                     <*> ((\{body} -> parseAgenda    =<< (convertErrors body)) <$> parallel (getString initialAgendaUrl))
+                     <*> ((\{body} -> parseAttendees =<< (convertErrors body)) <$> parallel (getString initialAttendeesUrl)))
     <#> rmap (\tpl ->
       { token:                           get1 tpl
       , agenda:    AG.jumpToFirstActive (get2 tpl)
