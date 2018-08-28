@@ -14,8 +14,10 @@ For development you should be good to go if you install the programs below:
 - Postgrest: https://github.com/begriffs/postgrest
 - PGJWT: https://github.com/michelp/pgjwt
 - postgres-websockets: https://github.com/diogob/postgres-websockets
+- pgTAP: https://github.com/theory/pgtap for testing the backend
+- pg_prove: https://pgtap.org/pg_prove.html also for testing the backend
 - Some SASS binary on your `$PATH`. There are a couple to choose between. libsass and SassC are used in development, so if you use them it should just work. https://sass-lang.com/libsass
-- A decent Purescript distribution
+- Purescript >= 0.12.0
 
 ### Initialize the database
 
