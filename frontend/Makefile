@@ -1,6 +1,6 @@
 all: package
 
-.PHONY: dev compile package all styles clean
+.PHONY: dev compile package all styles clean test
 
 package: compile
 	cat main.js | closure-compiler > main2.js
@@ -17,6 +17,9 @@ styles:
 
 install-dependencies:
 	psc-package install
+
+test:
+	pulp --psc-package test
 
 clean:
 	rm -rf .psc-package/ .pulp-cache/ .psci_modules/ bower_components/ output/

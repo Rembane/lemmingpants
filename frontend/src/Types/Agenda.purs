@@ -2,7 +2,6 @@ module Types.Agenda
   ( AgendaItem(..)
   , Agenda
   , _AgendaItems
-  , _CurrentAgendaItem
   , _SpeakerQueues
   , topSQ
   , pushSQ
@@ -19,13 +18,12 @@ import Types.SpeakerQueue
 
 import Control.Alternative ((<|>))
 import Data.Array as A
-import Data.Either (Either, note)
+import Data.Either (Either(..), note)
 import Data.Lens (Lens', element, lens, over, preview, traverseOf, traversed)
 import Data.List as L
-import Data.Maybe (Maybe, fromJust, fromMaybe)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
-import Partial.Unsafe (unsafePartial)
-import Prelude (class Eq, class Ord, class Show, compare, const, show, ($), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>>>))
+import Prelude (class Eq, class Ord, class Show, compare, const, eq, otherwise, show, (&&), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>>>))
 import Record as R
 import Simple.JSON (class ReadForeign, readImpl)
 import Type.Prelude (SProxy(..))
@@ -91,21 +89,18 @@ data Agenda = Agenda Int (Array AgendaItem)
 instance rfAg :: ReadForeign Agenda where
   readImpl fr = Agenda 0 <$> readImpl fr
 
+instance showAgenda :: Show Agenda where
+  show (Agenda i xs) = "Agenda " <> show i <> "\n" <> show xs
+
+instance equalAgenda :: Eq Agenda where
+  eq (Agenda i1 xs1) (Agenda i2 xs2) = eq i1 i2 && eq xs1 xs2
+
 -- | How to get insight into the agenda.
 _AgendaItems :: Lens' Agenda (Array AgendaItem)
 _AgendaItems
   = lens
       (\(Agenda _ items)       -> items)
       (\(Agenda i _    ) items -> Agenda i items)
-
--- | The implementation of this is quite unsafe, but hopefully
--- | we can't break it. :D
--- | I think that setIdx makes sure that the invariants hold.
-_CurrentAgendaItem :: Lens' Agenda AgendaItem
-_CurrentAgendaItem
-  = lens
-      (\(Agenda i items)   -> unsafePartial $ fromJust $ A.index items i)
-      (\(Agenda i items) a -> Agenda i $ unsafePartial $ fromJust $ A.updateAt i a items)
 
 -- | Set the internal index to the first argument, and return Just the Agenda.
 -- | If out of bounds, return Nothing.
@@ -130,14 +125,17 @@ insert ai = over _AgendaItems (A.insert ai)
 
 -- | This is an interesting beast...
 -- | It jumps to first active or last agenda item.
--- | It will crash horribly if the agenda is empty.
+-- | It does nothing if the agenda is empty.
 jumpToFirstActive :: Agenda -> Agenda
-jumpToFirstActive (Agenda _ as) = Agenda i as
-  where
-    i = fromMaybe ((A.length as) - 1)
-      (A.findIndex (\(AgendaItem a) -> a.state == "active") as
-      <|> A.findIndex (\(AgendaItem a) -> a.state /= "done") as)
+jumpToFirstActive noop@(Agenda _ xs)
+  | A.null xs = noop
+  | otherwise = Agenda i xs
+    where
+     i = fromMaybe ((A.length xs) - 1)
+          (A.findIndex (\(AgendaItem a) -> a.state == "active") xs
+          <|> A.findIndex (\(AgendaItem a) -> a.state /= "done") xs)
 
 getCurrentAI :: Agenda -> Either String AgendaItem
-getCurrentAI
-  = note "ERROR: There is no current agenda item." <<< preview _CurrentAgendaItem
+getCurrentAI (Agenda i xs)
+  | A.null xs = Left "ERROR: There is no current agenda item."
+  | otherwise = note "ERROR: Current agenda item index out of bounds." (A.index xs i)

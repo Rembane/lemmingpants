@@ -13,7 +13,7 @@ import Halogen.HTML.Properties as HP
 import Affjax.StatusCode (StatusCode(..))
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, identity, map, pure, unit, ($), (*>), (<>), (==), (>>=))
+import Prelude (type (~>), Unit, bind, const, identity, pure, unit, ($), (*>), (<>), (==), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
@@ -55,14 +55,14 @@ component =
               [ HH.button
                 [ HE.onClick (HE.input_ PreviousAI), HP.id_ "prev-button" ]
                 [ HH.text "⇐" ]
-              , HH.text (either identity identity (map (\(AgendaItem a) -> a.title) currentAI))
+              , HH.text (either identity (\(AgendaItem a) -> a.title) currentAI)
               , HH.button
                 [ HE.onClick (HE.input_ NextAI), HP.id_ "next-button" ]
                 [ HH.text "⇒" ]
               ]
             ] <> either
                 (const [HH.text "No agenda item => no speaker queue."])
-                (\ai@(AgendaItem ai') ->
+                (\ai@(AgendaItem {id, speakerQueues}) ->
                   [ case AG.topSQ ai of
                       Nothing -> HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
                       Just sq ->
@@ -72,8 +72,8 @@ component =
                           { speakerQueue: sq
                           , token:        state.token
                           , attendees:    state.attendees
-                          , agendaItemId: ai'.id
-                          , sqHeight:     L.length ai'.speakerQueues
+                          , agendaItemId: id
+                          , sqHeight:     L.length speakerQueues
                           }
                           (HE.input SQMsg)
                   ])

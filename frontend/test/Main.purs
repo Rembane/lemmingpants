@@ -1,10 +1,10 @@
 module Test.Main where
 
-import Effect (Effect)
 import Data.Array as A
 import Data.Either (Either(..))
 import Data.Lens (over)
 import Data.Maybe (Maybe(Nothing, Just), fromJust)
+import Effect (Effect)
 import Partial.Unsafe (unsafePartial)
 import Prelude (Unit, discard, identity, otherwise, show, unit, ($), (&&), (<), (<=), (<>), (==), (||))
 import Simple.JSON (readJSON)
@@ -14,6 +14,7 @@ import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.QuickCheck (quickCheck)
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (run)
+import Types.Agenda (empty, getCurrentAI, jumpToFirstActive)
 import Types.Speaker as S
 import Types.SpeakerQueue (SpeakerQueue(SpeakerQueue), _Speakers)
 
@@ -60,6 +61,16 @@ theSpeakersLensRespectsInvariants sq@(SpeakerQueue sqr)
 
 main :: Effect Unit
 main = run [consoleReporter] do
+  describe "getCurrentAI" do
+    it "doesn't crash if the Agenda is empty" $ do
+      shouldEqual
+        (getCurrentAI empty)
+        (Left "ERROR: There is no current agenda item.")
+  describe "jumpToFirstActive" do
+    it "does nothing if the Agenda is empty" $ do
+      shouldEqual
+        (jumpToFirstActive empty)
+        empty
   describe "Speakers" do
     they "are sorted correctly" $ quickCheck speakersAreSortedCorrectly
   describe "SpeakerQueue" do
