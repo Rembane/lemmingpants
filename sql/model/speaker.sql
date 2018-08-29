@@ -13,6 +13,9 @@ CREATE TABLE speaker (
     state            speaker_state DEFAULT 'init' NOT NULL,
     created          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE speaker ENABLE ROW LEVEL SECURITY;
+
 -- At most one speaker per queue may be active at the same time.
 CREATE UNIQUE INDEX ON speaker (speaker_queue_id) WHERE state='active';
 
@@ -27,7 +30,8 @@ GRANT REFERENCES ON speaker TO admin_user;
 
 GRANT USAGE ON SEQUENCE speaker_id_seq TO admin_user, authorized_attendee;
 
--- CREATE POLICY insert_me_as_a_speaker ON speaker FOR INSERT
+CREATE POLICY insert_me_as_a_speaker ON speaker FOR INSERT TO authorized_attendee
+    WITH CHECK (current_setting('request.jwt.claim.lp_aid')::INTEGER = attendee_id);
 
 -- This is websocket_news() on steroids.
 -- It does a join with active_speakers to give us the data we want
