@@ -1,9 +1,9 @@
-FROM postgres:9.6
-#pgjwt and pgtap needs postgresql-server-dev-9.6.
+FROM postgres:10.5
+#pgjwt and pgtap needs postgresql-server-dev-10.5.
 RUN apt-get update && apt-get install -y \
         curl \
         git \
-        postgresql-server-dev-9.6  \
+        postgresql-server-dev-10.5  \
         sudo \
         make
 
@@ -14,7 +14,15 @@ RUN mkdir -p /setup
 # You can get it here: https://github.com/michelp/pgjwt
 RUN git clone https://github.com/michelp/pgjwt /setup/pgwjt
 WORKDIR /setup/pgwjt
-RUN make install
+
+# Install Haskell Stack.
+RUN curl https://get.haskellstack.org/ | sh
+
+# Install postgrest
+RUN git clone https://github.com/PostgREST/postgrest.git /setup/postgrest
+WORKDIR /setup/postgrest
+RUN git checkout v5.1.0
+RUN stack install
 
 # Install pgtap.
 # pgtap is the test framework used to test stored procedures
@@ -29,3 +37,9 @@ RUN git clone https://github.com/theory/pgtap/ /pgtap \
   # This might be a bad idea, consider solving this using
   # by installing as normal user
   && chmod -R 777 /pgtap
+
+# Create the volume needed for running Lemmingpants.
+RUN mkdir -p /srv/lemmingpants
+ADD ./ /srv/lemmingpants
+EXPOSE 3000
+CMD /srv/lemmingpants/docker/start.sh
