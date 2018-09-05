@@ -2,14 +2,39 @@
   hosts: all
   gather_facts: no
   tasks:
-    - name: Boostrap python
+    - name: Bootstrap Python
       raw: test -e /usr/bin/python || (apt-get -y update && apt-get install -y python-minimal)
 
-- name: Provision other requirements
+- name: Create needed directories
   hosts: all
   gather_facts: no
   tasks:
-    - shell: apt-get -y install curl git make postgresql-server-dev-9.6
+    - name: Create the /setup-directory.
+      file: path=/setup state=directory
+
+- name: Install all needed packages
+  hosts: all
+  gather_facts: no
+  tasks:
+    - apt:
+        name: "{{packages}}"
+      vars:
+        packages:
+          - curl
+          - git
+          - libncurses5-dev
+          - make
+          - postgresql
+          - postgresql-server-dev-10
+          - sassc
+          - g++
+          - gcc
+          - libc6-dev
+          - libffi-dev
+          - libgmp-dev
+          - xz-utils
+          - zlib1g-dev
+          - gnupg
 
 - name: Provision pgjwt
   hosts: all
@@ -21,22 +46,69 @@
         chdir: /setup/pgjwt
         target: install
 
-# TODO: Install pgtap
+# TODO: Install pgtap and pg_prove and run all tests.
 
 - name: Provision Haskell Stack
   hosts: all
   tasks:
-    - shell: curl https://get.haskellstack.org/ | sh
+    - name: Download the Stack tarball.
+      get_url:
+        url: https://get.haskellstack.org/stable/linux-x86_64.tar.gz
+        dest: /setup/stack-x86_64.tar.gz
+    - name: Unpack the Stack tarball.
+      unarchive:
+        src: /setup/stack-x86_64.tar.gz
+        dest: /setup
+        remote_src: yes
+    - name: Move the stack executable to path
+      copy:
+        src: /setup/stack-1.7.1-linux-x86_64/stack
+        dest: /usr/local/bin
+        remote_src: yes
+        mode: 0755
 
 - name: Install Postgrest
   hosts: all
   tasks:
-    - name: Clone Postgrest git repository
+    - name: Download Postgrest binary distribution
+      get_url:
+        url: https://github.com/PostgREST/postgrest/releases/download/v5.1.0/postgrest-v5.1.0-ubuntu.tar.xz
+        dest: /setup
+    - name: Unpack postgrest binary to /usr/local/bin
+      unarchive:
+        src: /setup/postgrest-v5.1.0-ubuntu.tar.xz
+        dest: /usr/local/bin
+        remote_src: yes
+
+- name: Install postgres-websockets
+  hosts: all
+  tasks:
+    - name: Clone postgres-websockets repository
       git:
-        repo: https://github.com/PostgREST/postgrest.git
-        dest: /setup/postgrest
-        version: v5.1.0
-    - name: Stack install postgrest
+        repo: https://github.com/diogob/postgres-websockets.git
+        dest: /setup/postgres-websockets
+    - name: Compile and install postgres-websockets
       shell: stack install
       args:
-        chdir: /setup/postgrest
+        chdir: /setup/postgres-websockets
+
+# Frontendy stuff
+
+- name: Install Purescript
+  hosts: all
+  tasks:
+    - name: Download Purescript tarball.
+      get_url:
+        url: https://github.com/purescript/purescript/releases/download/v0.12.0/linux64.tar.gz
+        dest: /setup
+        checksum: 08d4839f2800a6fdb398ec45b7182eada112ea89
+    - name: Unpack Purescript compiler
+      unarchive:
+        src: /setup/linux64.tar.gz
+        dest: /setup
+        remote_src: yes
+    - name: Copy compiler executable to the right place
+      copy:
+        src: /setup/purescript/purs
+        dest: /usr/local/bin
+        remote_src: yes

@@ -2,9 +2,9 @@
   "builders": [
     {
       "type": "docker",
-      "image": "postgres:10.5",
+      "image": "ubuntu:18.04",
       "commit": true,
-      "changes": ["VOLUME /setup", "WORKDIR /", "EXPOSE 3000"]
+      "changes": ["WORKDIR /", "EXPOSE 3000"]
     }
   ],
 
