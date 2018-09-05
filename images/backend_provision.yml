@@ -1,5 +1,3 @@
----
-
 - name: Provision Python
   hosts: all
   gather_facts: no
@@ -11,7 +9,7 @@
   hosts: all
   gather_facts: no
   tasks:
-      - shell: apt-get -y install curl git make postgresql-server-dev-9.6
+    - shell: apt-get -y install curl git make postgresql-server-dev-9.6
 
 - name: Provision pgjwt
   hosts: all
@@ -28,7 +26,7 @@
 - name: Provision Haskell Stack
   hosts: all
   tasks:
-      - shell: curl https://get.haskellstack.org/ | sh
+    - shell: curl https://get.haskellstack.org/ | sh
 
 - name: Install Postgrest
   hosts: all
@@ -42,4 +40,3 @@
       shell: stack install
       args:
         chdir: /setup/postgrest
-
