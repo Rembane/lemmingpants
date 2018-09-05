@@ -1,0 +1,27 @@
+{
+  "builders": [
+    {
+      "type": "docker",
+      "image": "lemmingpants-backend:latest",
+      "commit": true,
+      "pull": false,
+      "changes": ["WORKDIR /", "EXPOSE 3000 8000"]
+    }
+  ],
+
+  "provisioners": [
+    {
+      "type": "ansible",
+      "user": "root",
+      "playbook_file": "backend_provision.yml"
+    }
+  ],
+
+  "post-processors": [
+    {
+      "type": "docker-tag",
+      "repository": "lemmingpants-backend",
+      "tag": "latest"
+    }
+  ]
+}

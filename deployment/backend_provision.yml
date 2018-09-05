@@ -1,0 +1,301 @@
+- name: Provision Python
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Bootstrap Python
+      raw: test -e /usr/bin/python || (apt-get -y update && apt-get install -y python-minimal)
+
+- name: Create needed directories
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Create the /setup-directory.
+      file: path=/setup state=directory mode=0777
+
+- name: Create needed users
+  hosts: all
+  tasks:
+    - name: Create the Lemmingpants group.
+      group:
+        name: lemmingpants
+        state: present
+    - name: Create the Lemmingpants user.
+      user:
+        group: lemmingpants
+        name: lemmingpants
+        shell: /bin/bash
+        state: present
+
+- name: Install all needed packages
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Install system packages...
+      apt:
+        name: "{{packages}}"
+      vars:
+        packages:
+          - curl
+          - git
+          - libncurses5-dev
+          - make
+          - postgresql
+          - postgresql-server-dev-10
+          - g++
+          - gcc
+          - libc6-dev
+          - libffi-dev
+          - libgmp-dev
+          - xz-utils
+          - zlib1g-dev
+          - gnupg
+          - python-psycopg2
+          - sudo
+    - name: Install cpanm
+      command: cpan install App::cpanminus
+
+- name: Start services that we would otherwise miss dearly
+  hosts: all
+  tasks:
+    - name: Start Postgresql
+      shell: /etc/init.d/postgresql start
+
+- name: Install pgtap and pg_prove
+  hosts: all
+  tasks:
+    - name: Does pg_prove exist?
+      stat: path=/usr/local/bin/pg_prove
+      register: pg_prove_binary
+    - name: Install pg_prove
+      when: pg_prove_binary.stat.exists == False
+      cpanm:
+        name: TAP::Parser::SourceHandler::pgTAP
+    - name: Does pgtap exist?
+      stat: path=/usr/share/postgresql/10/extension/pgtap.sql
+      register: pgtap_file
+    - name: Clone the pgtap repo
+      when: pgtap_file.stat.exists == False
+      git:
+        repo: https://github.com/theory/pgtap.git
+        dest: /setup/pgtap
+    - name: pgtap - Run make
+      when: pgtap_file.stat.exists == False
+      make:
+        chdir: /setup/pgtap
+    - name: pgtap - Run make install
+      when: pgtap_file.stat.exists == False
+      make:
+        chdir: /setup/pgtap
+        target: install
+    - name: Make postgres own /setup/pgtap
+      when: pgtap_file.stat.exists == False
+      file:
+        path: /setup/pgtap
+        owner: postgres
+        group: postgres
+        recurse: yes
+    - name: pgtap - Run make installcheck
+      when: pgtap_file.stat.exists == False
+      become: yes
+      become_user: postgres
+      make:
+        chdir: /setup/pgtap
+        target: installcheck
+
+- name: Provision pgjwt
+  hosts: all
+  tasks:
+    - name: Does pgjwt exist?
+      stat: path=/usr/share/postgresql/10/extension/pgjwt.control
+      register: pgjwt_file
+    - name: Clone pgjwt git repo
+      when: pgjwt_file.stat.exists == False
+      git:
+        repo: https://github.com/michelp/pgjwt.git
+        dest: /setup/pgjwt
+    - name: Install pgjwt
+      when: pgjwt_file.stat.exists == False
+      make:
+        chdir: /setup/pgjwt
+        target: install
+
+- name: Provision Haskell Stack
+  hosts: all
+  tasks:
+    - name: Lets see if stack exists.
+      stat: path=/usr/local/bin/stack
+      register: stack_binary
+    - name: Download the Stack tarball.
+      when: stack_binary.stat.exists == False
+      get_url:
+        url: https://get.haskellstack.org/stable/linux-x86_64.tar.gz
+        dest: /setup/stack-x86_64.tar.gz
+    - name: Unpack the Stack tarball.
+      when: stack_binary.stat.exists == False
+      unarchive:
+        src: /setup/stack-x86_64.tar.gz
+        dest: /setup
+        remote_src: yes
+    - name: Move the stack executable to path
+      when: stack_binary.stat.exists == False
+      copy:
+        src: /setup/stack-1.7.1-linux-x86_64/stack
+        dest: /usr/local/bin
+        remote_src: yes
+        mode: 0755
+
+- name: Install Postgrest
+  hosts: all
+  tasks:
+    - name: Is Postgrest installed?
+      stat: path=/usr/local/bin/postgrest
+      register: postgrest_binary
+    - name: Download Postgrest binary distribution
+      when: postgrest_binary.stat.exists == False
+      get_url:
+        url: https://github.com/PostgREST/postgrest/releases/download/v5.1.0/postgrest-v5.1.0-ubuntu.tar.xz
+        dest: /setup
+    - name: Unpack postgrest binary to /usr/local/bin
+      when: postgrest_binary.stat.exists == False
+      unarchive:
+        src: /setup/postgrest-v5.1.0-ubuntu.tar.xz
+        dest: /usr/local/bin
+        remote_src: yes
+
+- name: Install postgres-websockets
+  hosts: all
+  tasks:
+    - name: Is postgres-websockets installed?
+      stat: path=/usr/local/bin/postgres-websockets
+      register: pw_binary
+    - name: Clone postgres-websockets repository
+      when: pw_binary.stat.exists == False
+      git:
+        repo: https://github.com/diogob/postgres-websockets.git
+        dest: /setup/postgres-websockets
+    - name: Compile and install postgres-websockets
+      when: pw_binary.stat.exists == False
+      shell: stack install --local-bin-path /usr/local/bin
+      args:
+        chdir: /setup/postgres-websockets
+
+- name: Compile Lemmingtools
+  hosts: all
+  tasks:
+    - name: Is lemmingtools installed?
+      stat: path=/usr/local/bin/lemmingtools-exe
+      register: lemmingtools_binary
+    - name: Clone Lemmingpants
+      when: lemmingtools_binary.stat.exists == False
+      git:
+        repo: https://github.com/Rembane/lemmingpants.git
+        dest: /setup/lemmingpants
+    - name: Compile and install lemmingtools
+      when: lemmingtools_binary.stat.exists == False
+      shell: stack install --local-bin-path /usr/local/bin
+      args:
+        chdir: /setup/lemmingpants/lemmingtools
+
+- name: Initialize the database
+  hosts: all
+  become: yes
+  become_user: postgres
+  tasks:
+    - name: Create the Lemmingpants user
+      postgresql_user:
+        name: lemmingpants
+        password: lemmingpants
+        role_attr_flags: CREATEDB
+    - name: Create the Lemmingpants database
+      postgresql_db:
+        name: lemmingpants
+        owner: lemmingpants
+    - name: Upload the secret creating script
+      become: yes
+      become_user: root
+      copy:
+        src: create_secret.sh
+        dest: /setup/create_secret.sh
+        owner: postgres
+        group: postgres
+        mode: 0755
+    - name: Set secret using a sweet script.
+      shell: /bin/bash create_secret.sh
+      args:
+        creates: /setup/secret_key.txt
+        chdir: /setup
+    - name: Copy the secret key to /usr/local/etc
+      become: yes
+      become_user: root
+      copy:
+        src: /setup/secret_key.txt
+        dest: /usr/local/etc/secret_key.txt
+        remote_src: yes
+        mode: 0644
+    - name: Create pgcrypto extension
+      postgresql_ext:
+        name: pgcrypto
+        db: lemmingpants
+    - name: Create pgtap extension
+      postgresql_ext:
+        name: pgtap
+        db: lemmingpants
+    - name: Create pgjwt extension
+      postgresql_ext:
+        name: pgjwt
+        db: lemmingpants
+    - name: Upload SQL files (1)
+      copy:
+        src: init.sql
+        dest: /setup/init.sql
+        follow: yes
+    - name: Upload SQL files (2)
+      copy:
+        src: sql/
+        dest: /setup/sql/
+        follow: yes
+    - name: Fill the database with tables and stuff...
+      shell: psql -d lemmingpants < init.sql
+      args:
+        chdir: /setup
+
+- name: Database tests
+  hosts: all
+  become: yes
+  become_user: postgres
+  tasks:
+    - name: Upload test files
+      copy:
+        src: pg_tests/
+        dest: /setup/pg_tests
+        follow: yes
+    - name: Run backend tests
+      make:
+        chdir: /setup/pg_tests
+
+- name: Upload configuration and other files...
+  hosts: all
+  tasks:
+    - name: Upload lemmingpants.conf
+      copy:
+        src: lemmingpants.conf
+        dest: /usr/local/etc/lemmingpants.conf
+        follow: yes
+        mode: 0644
+    - name: Upload run_backend.sh
+      copy:
+        src: run_backend.sh
+        dest: /usr/local/bin/run_backend.sh
+        mode: 0755
+
+- name: Clean up
+  hosts: all
+  tasks:
+    - name: Delete /setup
+      file:
+        path: /setup
+        state: absent
+    - name: Delete /root/.stack
+      file:
+        path: /root/.stack
+        state: absent

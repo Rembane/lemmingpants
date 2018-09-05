@@ -1,0 +1,27 @@
+{
+  "builders": [
+    {
+      "type": "docker",
+      "image": "ubuntu",
+      "commit": true,
+      "pull": false,
+      "changes": ["WORKDIR /"]
+    }
+  ],
+
+  "provisioners": [
+    {
+      "type": "ansible",
+      "user": "root",
+      "playbook_file": "frontend_provision.yml"
+    }
+  ],
+
+  "post-processors": [
+    {
+      "type": "docker-tag",
+      "repository": "lemmingpants-frontend",
+      "tag": "latest"
+    }
+  ]
+}

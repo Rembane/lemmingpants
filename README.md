@@ -22,8 +22,11 @@ For development you should be good to go if you install the programs below:
   SassC are used in development, so if you use them it should just work.
   https://sass-lang.com/libsass
 - Purescript >= 0.12.0
-- pulp: https://github.com/purescript-contrib/pulp a recent version, otherwise you
-  will get scary error messages.
+- psc-package: https://github.com/purescript/psc-package is used for
+  handling dependencies.
+- node is used for running the tests.
+- Packer and Ansible for creating the Docker images.
+- Docker if you need it.
 
 ### Initialize the database
 
@@ -46,8 +49,20 @@ Build the frontend by running `make dev` in the `frontend/` directory.
 
 ## Running with docker
 
-Run `docker-build.sh` and wait for everything to build, then run
-`docker-compose up` and things should work.
+This builds and starts the containers.
+
+```
+cd frontend
+./build_all.sh
+docker-compose up
+```
+
+And this compiles the Purescript frontend code:
+
+```
+cd frontend
+docker-compose up lemmingpants-frontend
+```
 
 ## Architecture
 

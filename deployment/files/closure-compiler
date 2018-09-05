@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+
+java -jar /usr/local/bin/closure-compiler.jar $@
