@@ -1,0 +1,45 @@
+---
+
+- name: Provision Python
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Boostrap python
+      raw: test -e /usr/bin/python || (apt-get -y update && apt-get install -y python-minimal)
+
+- name: Provision other requirements
+  hosts: all
+  gather_facts: no
+  tasks:
+      - shell: apt-get -y install curl git make postgresql-server-dev-9.6
+
+- name: Provision pgjwt
+  hosts: all
+  tasks:
+    - git:
+        repo: https://github.com/michelp/pgjwt.git
+        dest: /setup/pgjwt
+    - make:
+        chdir: /setup/pgjwt
+        target: install
+
+# TODO: Install pgtap
+
+- name: Provision Haskell Stack
+  hosts: all
+  tasks:
+      - shell: curl https://get.haskellstack.org/ | sh
+
+- name: Install Postgrest
+  hosts: all
+  tasks:
+    - name: Clone Postgrest git repository
+      git:
+        repo: https://github.com/PostgREST/postgrest.git
+        dest: /setup/postgrest
+        version: v5.1.0
+    - name: Stack install postgrest
+      shell: stack install
+      args:
+        chdir: /setup/postgrest
+
