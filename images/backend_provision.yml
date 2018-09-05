@@ -101,7 +101,7 @@
       get_url:
         url: https://github.com/purescript/purescript/releases/download/v0.12.0/linux64.tar.gz
         dest: /setup
-        checksum: 08d4839f2800a6fdb398ec45b7182eada112ea89
+        checksum: sha1:08d4839f2800a6fdb398ec45b7182eada112ea89
     - name: Unpack Purescript compiler
       unarchive:
         src: /setup/linux64.tar.gz
