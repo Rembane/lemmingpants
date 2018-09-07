@@ -27,7 +27,6 @@
           - make
           - postgresql
           - postgresql-server-dev-10
-          - sassc
           - g++
           - gcc
           - libc6-dev
@@ -87,7 +86,7 @@
         repo: https://github.com/diogob/postgres-websockets.git
         dest: /setup/postgres-websockets
     - name: Compile and install postgres-websockets
-      shell: stack install
+      shell: stack install --local-bin-path /usr/local/bin
       args:
         chdir: /setup/postgres-websockets
 
@@ -107,3 +106,15 @@
       make:
         chdir: /setup/pgtap
         target: install
+
+- name: Compile Lemmingtools
+  hosts: all
+  tasks:
+    - name: Clone Lemmingpants
+      git:
+        repo: https://github.com/Rembane/lemmingpants.git
+        dest: /setup/lemmingpants
+    - name: Compile and install lemmingtools
+      shell: stack install --local-bin-path /usr/local/bin
+      args:
+        chdir: /setup/lemmingpants/lemmingtools
