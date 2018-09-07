@@ -1,0 +1,45 @@
+- name: Provision Python
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Bootstrap Python
+      raw: test -e /usr/bin/python || (apt-get -y update && apt-get install -y python-minimal)
+
+- name: Create needed directories
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Create the /setup-directory.
+      file: path=/setup state=directory
+
+- name: Install psc-package
+  hosts: all
+  tasks:
+    - name: Download psc-package tarball
+      get_url: https://github.com/purescript/psc-package/releases/download/v0.4.2/linux64.tar.gz
+      dest: /setup
+      checksum: sha1:bdf25acc5b4397bd03fd1da024896c5f33af85ce
+      # TODO: Install closure compiler
+      # TODO: Certbot
+      # TODO: Install lemmingtools
+
+# Frontendy stuff
+- name: Install Purescript
+  hosts: all
+  tasks:
+    - name: Download Purescript tarball.
+      get_url:
+        url: https://github.com/purescript/purescript/releases/download/v0.12.0/linux64.tar.gz
+        dest: /setup
+        checksum: sha1:08d4839f2800a6fdb398ec45b7182eada112ea89
+    - name: Unpack Purescript compiler
+      unarchive:
+        src: /setup/linux64.tar.gz
+        dest: /setup
+        remote_src: yes
+    - name: Copy compiler executable to the right place
+      copy:
+        src: /setup/purescript/purs
+        dest: /usr/local/bin
+        mode: 0755
+        remote_src: yes
