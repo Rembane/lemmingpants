@@ -4,7 +4,7 @@
       "type": "docker",
       "image": "ubuntu:18.04",
       "commit": true,
-      "changes": ["WORKDIR /", "EXPOSE 3000"]
+      "changes": ["VOLUME /lemmingpants", "WORKDIR /", "EXPOSE 3000 8000", "LABEL lemmingpants-backend", "ENTRYPOINT /lemmingpants/deployment/run.sh"]
     }
   ],
 
