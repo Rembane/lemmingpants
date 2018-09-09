@@ -1,12 +1,6 @@
 -- Initialization ------------------------------------------------------------
 --
 -- NOTE: The role lemmingpants and the database lemmingpants must exist!
---
--- Drop all schemas, recreate them and make sure that Lemmingpants own them.
-ALTER DATABASE lemmingpants SET "app.jwt_secret" TO "feBU1ykZ4icKs2nKam9l8CD84qhgeOl6QQakrUJBiRTUu4dKTLVoH8o";
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS pgjwt;
-CREATE EXTENSION IF NOT EXISTS pgtap;
 
 DROP SCHEMA IF EXISTS model CASCADE;
 CREATE SCHEMA model AUTHORIZATION lemmingpants;

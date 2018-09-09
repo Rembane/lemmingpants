@@ -17,7 +17,8 @@
   gather_facts: no
   tasks:
     - apt:
-        name: "{{packages}}"
+      name: "{{packages}}"
+      update_cache: yes
       vars:
         packages:
           - cpanm
@@ -45,6 +46,10 @@
     - make:
         chdir: /setup/pgjwt
         target: install
+    - name: Create the extension
+      becomes: yes
+      become_user: postgres
+      shell: "CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS pgjwt;" | psql
 
 - name: Provision Haskell Stack
   hosts: all
@@ -106,6 +111,10 @@
       make:
         chdir: /setup/pgtap
         target: install
+    - name: Create the extension
+      becomes: yes
+      become_user: postgres
+      shell: "CREATE EXTENSION IF NOT EXISTS pgtap;" | psql
 
 - name: Compile Lemmingtools
   hosts: all
@@ -118,3 +127,16 @@
       shell: stack install --local-bin-path /usr/local/bin
       args:
         chdir: /setup/lemmingpants/lemmingtools
+
+- name: Initialize the database
+  hosts: all
+  become: yes
+  become_user: postgres
+  tasks:
+    - name: Set secret
+      shell:
+
+        ALTER DATABASE lemmingpants SET "app.jwt_secret" TO "feBU1ykZ4icKs2nKam9l8CD84qhgeOl6QQakrUJBiRTUu4dKTLVoH8o";
+
+
+
