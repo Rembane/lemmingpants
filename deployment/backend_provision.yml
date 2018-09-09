@@ -133,10 +133,36 @@
   become: yes
   become_user: postgres
   tasks:
+    - name: Create the Lemmingpants user
+      shell: createuser -dP lemmingpants < lemmingpants
+    - name: Create the Lemmingpants database
+      shell: createdb -O lemmingpants lemmingpants
     - name: Set secret
-      shell:
-
-        ALTER DATABASE lemmingpants SET "app.jwt_secret" TO "feBU1ykZ4icKs2nKam9l8CD84qhgeOl6QQakrUJBiRTUu4dKTLVoH8o";
-
-
-
+      shell: |
+          PATH=/setup/secret_key.txt
+          if [ ! -f $PATH ]; then
+            CHARS=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+            RESULT=""
+            for _ in {1..50}; do
+              RESULT=$RESULT${CHARS:RANDOM%${#CHARS}:1}
+            done
+            echo $RESULT > $PATH
+          fi;
+          KEY=`cat $PATH`
+          psql -d lemmingpants < ALTER DATABASE lemmingpants SET "app.jwt_secret" TO "'$KEY'"
+      args:
+        creates: /setup/secret_key.txt
+    - name: Upload SQL files (1)
+      copy:
+        src: init.sql
+        dest: /setup/init.sql
+    - name: Upload SQL files (2)
+      copy:
+        src: sql/
+        dest: /setup/sql/
+    - name: Fill the database with tables and stuff...
+      becomes: yes
+      become_user: lemmingpants
+      shell: psql -d lemmingpants < init.sql
+      args:
+        chdir: /setup
