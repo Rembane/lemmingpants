@@ -4,7 +4,13 @@
       "type": "docker",
       "image": "ubuntu:18.04",
       "commit": true,
-      "changes": ["VOLUME /lemmingpants", "WORKDIR /", "EXPOSE 3000 8000", "LABEL lemmingpants-backend", "ENTRYPOINT /lemmingpants/deployment/run.sh"]
+      "changes": [
+        "VOLUME /lemmingpants",
+        "WORKDIR /",
+        "EXPOSE 3000 8000",
+        "LABEL lemmingpants-backend",
+        "ENTRYPOINT /lemmingpants/deployment/run.sh"
+      ]
     }
   ],
 
@@ -12,7 +18,11 @@
     {
       "type": "ansible",
       "user": "root",
-      "playbook_file": "backend_provision.yml"
+      "playbook_file": "backend_provision.yml",
+      "extra_arguments": [
+        "--limit",
+        "@/home/hace/dev/haskell/lemmingpants/deployment/backend_provision.retry"
+      ]
     }
   ]
 }

@@ -16,12 +16,11 @@
   hosts: all
   gather_facts: no
   tasks:
-    - apt:
-      name: "{{packages}}"
-      update_cache: yes
+    - name: Install system packages...
+      apt:
+        name: "{{packages}}"
       vars:
         packages:
-          - cpanm
           - curl
           - git
           - libncurses5-dev
@@ -36,6 +35,11 @@
           - xz-utils
           - zlib1g-dev
           - gnupg
+          - python-psycopg2
+    - name: Install cpanm
+      command: cpan install App::cpanminus
+
+# TODO: Check that Postgres is running!
 
 - name: Provision pgjwt
   hosts: all
@@ -46,10 +50,6 @@
     - make:
         chdir: /setup/pgjwt
         target: install
-    - name: Create the extension
-      becomes: yes
-      become_user: postgres
-      shell: "CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS pgjwt;" | psql
 
 - name: Provision Haskell Stack
   hosts: all
@@ -99,7 +99,8 @@
   hosts: all
   tasks:
     - name: Install pg_prove
-      cpanm: pg_prove
+      cpanm:
+        name: TAP::Parser::SourceHandler::pgTAP
     - name: Clone the pgtap repo
       git:
         repo: https://github.com/theory/pgtap.git
@@ -111,10 +112,10 @@
       make:
         chdir: /setup/pgtap
         target: install
-    - name: Create the extension
-      becomes: yes
-      become_user: postgres
-      shell: "CREATE EXTENSION IF NOT EXISTS pgtap;" | psql
+    - name: pgtap - Run make installcheck
+      make:
+        chdir: /setup/pgtap
+        target: installcheck
 
 - name: Compile Lemmingtools
   hosts: all
@@ -134,24 +135,32 @@
   become_user: postgres
   tasks:
     - name: Create the Lemmingpants user
-      shell: createuser -dP lemmingpants < lemmingpants
+      postgresql_user:
+        db: lemmingpants
+        name: lemmingpants
+        password: lemmingpants
+        role_attr_flags: CREATEDB
     - name: Create the Lemmingpants database
-      shell: createdb -O lemmingpants lemmingpants
+      postgresql_db:
+        name: lemmingpants
+        owner: lemmingpants
     - name: Set secret
-      shell: |
-          PATH=/setup/secret_key.txt
-          if [ ! -f $PATH ]; then
-            CHARS=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
-            RESULT=""
-            for _ in {1..50}; do
-              RESULT=$RESULT${CHARS:RANDOM%${#CHARS}:1}
-            done
-            echo $RESULT > $PATH
-          fi;
-          KEY=`cat $PATH`
-          psql -d lemmingpants < ALTER DATABASE lemmingpants SET "app.jwt_secret" TO "'$KEY'"
+      shell: create_secret.sh
       args:
         creates: /setup/secret_key.txt
+        executable: /bin/bash
+    - name: Create pgcrypto extension
+      postgresql_ext:
+        name: pgcrypto
+        db: lemmingpants
+    - name: Create pgtap extension
+      postgresql_ext:
+        name: pgtap
+        db: lemmingpants
+    - name: Create pgjwt extension
+      postgresql_ext:
+        name: pgjwt
+        db: lemmingpants
     - name: Upload SQL files (1)
       copy:
         src: init.sql
@@ -166,3 +175,13 @@
       shell: psql -d lemmingpants < init.sql
       args:
         chdir: /setup
+    - name: Upload test files
+      copy:
+        src: pg_tests
+        dest: /setup/pg_tests
+    - name: Run backend tests
+      becomes: yes
+      become_user: lemmingpants
+      make:
+        chdir: /setup/pg_tests
+        target: test
