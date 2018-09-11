@@ -36,10 +36,48 @@
           - zlib1g-dev
           - gnupg
           - python-psycopg2
+          - sudo
     - name: Install cpanm
       command: cpan install App::cpanminus
 
-# TODO: Check that Postgres is running!
+- name: Start services that we would otherwise miss dearly
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Start Postgresql
+      service:
+        name: postgresql
+        state: started
+
+- name: Install pgtap and pg_prove
+  hosts: all
+  tasks:
+    - name: Install pg_prove
+      cpanm:
+        name: TAP::Parser::SourceHandler::pgTAP
+    - name: Clone the pgtap repo
+      git:
+        repo: https://github.com/theory/pgtap.git
+        dest: /setup/pgtap
+    - name: pgtap - Run make
+      make:
+        chdir: /setup/pgtap
+    - name: pgtap - Run make install
+      make:
+        chdir: /setup/pgtap
+        target: install
+    - name: Make postgres own /setup/pgtap
+      file:
+        path: /setup/pgtap
+        owner: postgres
+        group: postgres
+        recurse: yes
+    - name: pgtap - Run make installcheck
+      become: yes
+      become_user: postgres
+      make:
+        chdir: /setup/pgtap
+        target: installcheck
 
 - name: Provision pgjwt
   hosts: all
@@ -94,28 +132,6 @@
       shell: stack install --local-bin-path /usr/local/bin
       args:
         chdir: /setup/postgres-websockets
-
-- name: Install pgtap and pg_prove
-  hosts: all
-  tasks:
-    - name: Install pg_prove
-      cpanm:
-        name: TAP::Parser::SourceHandler::pgTAP
-    - name: Clone the pgtap repo
-      git:
-        repo: https://github.com/theory/pgtap.git
-        dest: /setup/pgtap
-    - name: pgtap - Run make
-      make:
-        chdir: /setup/pgtap
-    - name: pgtap - Run make install
-      make:
-        chdir: /setup/pgtap
-        target: install
-    - name: pgtap - Run make installcheck
-      make:
-        chdir: /setup/pgtap
-        target: installcheck
 
 - name: Compile Lemmingtools
   hosts: all
