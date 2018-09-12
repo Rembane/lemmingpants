@@ -2,7 +2,7 @@
   "builders": [
     {
       "type": "docker",
-      "image": "lp1",
+      "image": "lp2",
       "commit": true,
       "pull": false,
       "changes": [
@@ -18,7 +18,8 @@
     {
       "type": "ansible",
       "user": "root",
-      "playbook_file": "backend_provision.yml"
+      "playbook_file": "backend_provision.yml",
+      "extra_arguments": ["-vvv"]
     }
   ]
 }

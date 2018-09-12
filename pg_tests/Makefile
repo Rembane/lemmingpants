@@ -7,4 +7,4 @@ test: preload
 	pg_prove -d $(DBNAME) --pset tuples_only=1 $(TESTS) -v
 
 preload:
-	./load-db.sh $(DBNAME)
+	/bin/bash load-db.sh $(DBNAME)

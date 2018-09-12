@@ -10,7 +10,21 @@
   gather_facts: no
   tasks:
     - name: Create the /setup-directory.
-      file: path=/setup state=directory
+      file: path=/setup state=directory mode=0777
+
+- name: Create needed users
+  hosts: all
+  tasks:
+    - name: Create the Lemmingpants group.
+      group:
+        name: lemmingpants
+        state: present
+    - name: Create the Lemmingpants user.
+      user:
+        group: lemmingpants
+        name: lemmingpants
+        shell: /bin/bash
+        state: present
 
 - name: Install all needed packages
   hosts: all
@@ -42,12 +56,12 @@
 
 - name: Start services that we would otherwise miss dearly
   hosts: all
-  gather_facts: no
   tasks:
     - name: Start Postgresql
       service:
         name: postgresql
         state: started
+        enabled: yes
 
 - name: Install pgtap and pg_prove
   hosts: all
@@ -205,16 +219,14 @@
       copy:
         src: create_secret.sh
         dest: /setup/create_secret.sh
-    - name: Make postgres own /setup/create_secret.sh
-      file:
-        path: /setup/create_secret.sh
         owner: postgres
         group: postgres
-    - name: Set secret
-      shell: /setup/create_secret.sh
+        mode: 0755
+    - name: Set secret using a sweet script.
+      shell: /bin/bash create_secret.sh
       args:
         creates: /setup/secret_key.txt
-        executable: /bin/bash
+        chdir: /setup
     - name: Create pgcrypto extension
       postgresql_ext:
         name: pgcrypto
@@ -231,23 +243,25 @@
       copy:
         src: init.sql
         dest: /setup/init.sql
+        follow: yes
     - name: Upload SQL files (2)
       copy:
         src: sql/
         dest: /setup/sql/
+        follow: yes
     - name: Fill the database with tables and stuff...
-      becomes: yes
-      become_user: lemmingpants
       shell: psql -d lemmingpants < init.sql
       args:
         chdir: /setup
     - name: Upload test files
       copy:
-        src: pg_tests
+        src: pg_tests/
         dest: /setup/pg_tests
+        follow: yes
+    - name: Show status of /setup/pg_tests
+      shell: ls -lh /setup/pg_tests
     - name: Run backend tests
       becomes: yes
       become_user: lemmingpants
       make:
         chdir: /setup/pg_tests
-        target: test
