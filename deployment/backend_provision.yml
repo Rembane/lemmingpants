@@ -253,15 +253,29 @@
       shell: psql -d lemmingpants < init.sql
       args:
         chdir: /setup
+
+- name: Database tests
+  hosts: all
+  become: yes
+  become_user: postgres
+  tasks:
     - name: Upload test files
       copy:
         src: pg_tests/
         dest: /setup/pg_tests
         follow: yes
-    - name: Show status of /setup/pg_tests
-      shell: ls -lh /setup/pg_tests
     - name: Run backend tests
-      becomes: yes
-      become_user: lemmingpants
       make:
         chdir: /setup/pg_tests
+
+- name: Clean up
+  hosts: all
+  tasks:
+    - name: Delete /setup
+      file:
+        path: /setup
+        state: absent
+    - name: Delete /root/.stack
+      file:
+        path: /root/.stack
+        state: absent

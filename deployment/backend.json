@@ -5,12 +5,7 @@
       "image": "lp2",
       "commit": true,
       "pull": false,
-      "changes": [
-        "VOLUME /lemmingpants",
-        "WORKDIR /",
-        "EXPOSE 3000 8000",
-        "LABEL lemmingpants-backend-version=1.0"
-      ]
+      "changes": ["WORKDIR /", "EXPOSE 3000 8000", "VOLUME /var/lib/postgresql"]
     }
   ],
 
@@ -18,8 +13,7 @@
     {
       "type": "ansible",
       "user": "root",
-      "playbook_file": "backend_provision.yml",
-      "extra_arguments": ["-vvv"]
+      "playbook_file": "backend_provision.yml"
     }
   ]
 }

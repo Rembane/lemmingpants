@@ -21,7 +21,6 @@
       checksum: sha1:bdf25acc5b4397bd03fd1da024896c5f33af85ce
       # TODO: Install closure compiler
       # TODO: Certbot
-      # TODO: Install lemmingtools
 
 # Frontendy stuff
 - name: Install Purescript
