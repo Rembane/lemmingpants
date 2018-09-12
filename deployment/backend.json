@@ -2,8 +2,9 @@
   "builders": [
     {
       "type": "docker",
-      "image": "ubuntu:18.04",
+      "image": "lp1",
       "commit": true,
+      "pull": false,
       "changes": [
         "VOLUME /lemmingpants",
         "WORKDIR /",

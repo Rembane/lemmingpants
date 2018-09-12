@@ -52,27 +52,39 @@
 - name: Install pgtap and pg_prove
   hosts: all
   tasks:
+    - name: Does pg_prove exist?
+      stat: path=/usr/local/bin/pg_prove
+      register: pg_prove_binary
     - name: Install pg_prove
+      when: pg_prove_binary.stat.exists == False
       cpanm:
         name: TAP::Parser::SourceHandler::pgTAP
+    - name: Does pgtap exist?
+      stat: path=/usr/share/postgresql/10/extension/pgtap.sql
+      register: pgtap_file
     - name: Clone the pgtap repo
+      when: pgtap_file.stat.exists == False
       git:
         repo: https://github.com/theory/pgtap.git
         dest: /setup/pgtap
     - name: pgtap - Run make
+      when: pgtap_file.stat.exists == False
       make:
         chdir: /setup/pgtap
     - name: pgtap - Run make install
+      when: pgtap_file.stat.exists == False
       make:
         chdir: /setup/pgtap
         target: install
     - name: Make postgres own /setup/pgtap
+      when: pgtap_file.stat.exists == False
       file:
         path: /setup/pgtap
         owner: postgres
         group: postgres
         recurse: yes
     - name: pgtap - Run make installcheck
+      when: pgtap_file.stat.exists == False
       become: yes
       become_user: postgres
       make:
@@ -82,26 +94,39 @@
 - name: Provision pgjwt
   hosts: all
   tasks:
-    - git:
+    - name: Does pgjwt exist?
+      stat: path=/usr/share/postgresql/10/extension/pgjwt.control
+      register: pgjwt_file
+    - name: Clone pgjwt git repo
+      when: pgjwt_file.stat.exists == False
+      git:
         repo: https://github.com/michelp/pgjwt.git
         dest: /setup/pgjwt
-    - make:
+    - name: Install pgjwt
+      when: pgjwt_file.stat.exists == False
+      make:
         chdir: /setup/pgjwt
         target: install
 
 - name: Provision Haskell Stack
   hosts: all
   tasks:
+    - name: Lets see if stack exists.
+      stat: path=/usr/local/bin/stack
+      register: stack_binary
     - name: Download the Stack tarball.
+      when: stack_binary.stat.exists == False
       get_url:
         url: https://get.haskellstack.org/stable/linux-x86_64.tar.gz
         dest: /setup/stack-x86_64.tar.gz
     - name: Unpack the Stack tarball.
+      when: stack_binary.stat.exists == False
       unarchive:
         src: /setup/stack-x86_64.tar.gz
         dest: /setup
         remote_src: yes
     - name: Move the stack executable to path
+      when: stack_binary.stat.exists == False
       copy:
         src: /setup/stack-1.7.1-linux-x86_64/stack
         dest: /usr/local/bin
@@ -111,11 +136,16 @@
 - name: Install Postgrest
   hosts: all
   tasks:
+    - name: Is Postgrest installed?
+      stat: path=/usr/local/bin/postgrest
+      register: postgrest_binary
     - name: Download Postgrest binary distribution
+      when: postgrest_binary.stat.exists == False
       get_url:
         url: https://github.com/PostgREST/postgrest/releases/download/v5.1.0/postgrest-v5.1.0-ubuntu.tar.xz
         dest: /setup
     - name: Unpack postgrest binary to /usr/local/bin
+      when: postgrest_binary.stat.exists == False
       unarchive:
         src: /setup/postgrest-v5.1.0-ubuntu.tar.xz
         dest: /usr/local/bin
@@ -124,11 +154,16 @@
 - name: Install postgres-websockets
   hosts: all
   tasks:
+    - name: Is postgres-websockets installed?
+      stat: path=/usr/local/bin/postgres-websockets
+      register: pw_binary
     - name: Clone postgres-websockets repository
+      when: pw_binary.stat.exists == False
       git:
         repo: https://github.com/diogob/postgres-websockets.git
         dest: /setup/postgres-websockets
     - name: Compile and install postgres-websockets
+      when: pw_binary.stat.exists == False
       shell: stack install --local-bin-path /usr/local/bin
       args:
         chdir: /setup/postgres-websockets
@@ -136,11 +171,16 @@
 - name: Compile Lemmingtools
   hosts: all
   tasks:
+    - name: Is lemmingtools installed?
+      stat: path=/usr/local/bin/lemmingtools
+      register: lemmingtools_binary
     - name: Clone Lemmingpants
+      when: lemmingtools_binary.stat.exists == False
       git:
         repo: https://github.com/Rembane/lemmingpants.git
         dest: /setup/lemmingpants
     - name: Compile and install lemmingtools
+      when: lemmingtools_binary.stat.exists == False
       shell: stack install --local-bin-path /usr/local/bin
       args:
         chdir: /setup/lemmingpants/lemmingtools
@@ -152,7 +192,6 @@
   tasks:
     - name: Create the Lemmingpants user
       postgresql_user:
-        db: lemmingpants
         name: lemmingpants
         password: lemmingpants
         role_attr_flags: CREATEDB
@@ -160,8 +199,19 @@
       postgresql_db:
         name: lemmingpants
         owner: lemmingpants
+    - name: Upload the secret creating script
+      become: yes
+      become_user: root
+      copy:
+        src: create_secret.sh
+        dest: /setup/create_secret.sh
+    - name: Make postgres own /setup/create_secret.sh
+      file:
+        path: /setup/create_secret.sh
+        owner: postgres
+        group: postgres
     - name: Set secret
-      shell: create_secret.sh
+      shell: /setup/create_secret.sh
       args:
         creates: /setup/secret_key.txt
         executable: /bin/bash
