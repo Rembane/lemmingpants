@@ -5,6 +5,21 @@
     - name: Bootstrap Python
       raw: test -e /usr/bin/python || (apt-get -y update && apt-get install -y python-minimal)
 
+- name: Install all needed packages
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Install system packages...
+      apt:
+        name: "{{packages}}"
+      vars:
+        packages:
+          - make
+          - sudo
+          - default-jre-headless
+          - sassc
+          - unzip
+
 - name: Create needed directories
   hosts: all
   gather_facts: no
@@ -15,10 +30,28 @@
 - name: Install psc-package
   hosts: all
   tasks:
+    - name: Does psc-package exist?
+      stat: path=/usr/local/bin/psc-package
+      register: pp_binary
     - name: Download psc-package tarball
-      get_url: https://github.com/purescript/psc-package/releases/download/v0.4.2/linux64.tar.gz
-      dest: /setup
-      checksum: sha1:bdf25acc5b4397bd03fd1da024896c5f33af85ce
+      when: pp_binary.stat.exists == False
+      get_url:
+        url: https://github.com/purescript/psc-package/releases/download/v0.4.2/linux64.tar.gz
+        dest: /setup
+        checksum: sha1:bdf25acc5b4397bd03fd1da024896c5f33af85ce
+    - name: Unpack psc-package tarball
+      when: pp_binary.stat.exists == False
+      unarchive:
+        src: /setup/linux64.tar.gz
+        dest: /setup
+        remote_src: yes
+    - name: Copy binary into place
+      when: pp_binary.stat.exists == False
+      copy:
+        src: /setup/psc-package/psc-package
+        dest: /usr/local/bin
+        remote_src: yes
+        mode: 0755
 
 # Frontendy stuff
 - name: Install Purescript
@@ -48,4 +81,28 @@
         remote_src: yes
 
 - name: Install Google Closure Compiler
-  https://dl.google.com/closure-compiler/compiler-latest.zip
+  hosts: all
+  tasks:
+    - name: Does Google Closure Compiler exist?
+      stat: path=/usr/local/bin/closure-compiler.jar
+      register: cc_binary
+    - name: Download Google Closure Compiler ZIP
+      when: cc_binary.stat.exists == False
+      get_url:
+        url: https://dl.google.com/closure-compiler/compiler-latest.zip
+        dest: /setup
+    - name: Unpack Google Closure Compiler
+      when: cc_binary.stat.exists == False
+      unarchive:
+        src: /setup/compiler-latest.zip
+        dest: /setup
+        remote_src: yes
+    - name: Move Google Closure Compiler into place
+      when: cc_binary.stat.exists == False
+      shell: mv /setup/closure-compiler-*.jar /usr/local/bin/closure-compiler.jar
+    - name: Upload the script that wraps the GCC
+      when: cc_binary.stat.exists == False
+      copy:
+        src: closure-compiler
+        dest: /usr/local/bin
+        mode: 0755
