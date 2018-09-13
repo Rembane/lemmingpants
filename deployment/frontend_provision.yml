@@ -19,26 +19,33 @@
       get_url: https://github.com/purescript/psc-package/releases/download/v0.4.2/linux64.tar.gz
       dest: /setup
       checksum: sha1:bdf25acc5b4397bd03fd1da024896c5f33af85ce
-      # TODO: Install closure compiler
-      # TODO: Certbot
 
 # Frontendy stuff
 - name: Install Purescript
   hosts: all
   tasks:
+    - name: Does purs exist?
+      stat: path=/usr/local/bin/purs
+      register: purs_binary
     - name: Download Purescript tarball.
+      when: purs_binary.stat.exists == False
       get_url:
         url: https://github.com/purescript/purescript/releases/download/v0.12.0/linux64.tar.gz
         dest: /setup
         checksum: sha1:08d4839f2800a6fdb398ec45b7182eada112ea89
     - name: Unpack Purescript compiler
+      when: purs_binary.stat.exists == False
       unarchive:
         src: /setup/linux64.tar.gz
         dest: /setup
         remote_src: yes
     - name: Copy compiler executable to the right place
+      when: purs_binary.stat.exists == False
       copy:
         src: /setup/purescript/purs
         dest: /usr/local/bin
         mode: 0755
         remote_src: yes
+
+- name: Install Google Closure Compiler
+  https://dl.google.com/closure-compiler/compiler-latest.zip

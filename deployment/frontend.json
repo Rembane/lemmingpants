@@ -2,10 +2,10 @@
   "builders": [
     {
       "type": "docker",
-      "image": "lp2",
+      "image": "ubuntu",
       "commit": true,
       "pull": false,
-      "changes": ["WORKDIR /", "EXPOSE 3000 8000", "VOLUME /var/lib/postgresql"]
+      "changes": ["WORKDIR /", "VOLUME /setup"]
     }
   ],
 
@@ -13,14 +13,14 @@
     {
       "type": "ansible",
       "user": "root",
-      "playbook_file": "backend_provision.yml"
+      "playbook_file": "frontend_provision.yml"
     }
   ],
 
   "post-processors": [
     {
       "type": "docker-tag",
-      "repository": "dtek/lemmingpants-backend",
+      "repository": "dtek/lemmingpants-frontend",
       "tag": "{{timestamp}}"
     }
   ]
