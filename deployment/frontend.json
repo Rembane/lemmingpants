@@ -20,8 +20,8 @@
   "post-processors": [
     {
       "type": "docker-tag",
-      "repository": "dtek/lemmingpants-frontend",
-      "tag": "{{timestamp}}"
+      "repository": "lemmingpants-frontend",
+      "tag": "latest"
     }
   ]
 }
