@@ -19,6 +19,7 @@
           - default-jre-headless
           - sassc
           - unzip
+          - nodejs
 
 - name: Create needed directories
   hosts: all
