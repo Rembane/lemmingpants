@@ -10,6 +10,10 @@ export PGRST_JWT_SECRET=`cat /usr/local/etc/secret_key.txt`
 
 /etc/init.d/postgresql start
 postgrest /usr/local/etc/lemmingpants.conf &
-postgres-websockets /usr/local/etc/lemmingpants.conf &
+
+{ # I think this is one of my better hacks.
+    export PGRST_SERVER_PORT=$PGRST_WS_SERVER_PORT
+    postgres-websockets /usr/local/etc/lemmingpants.conf &
+}
 
 wait

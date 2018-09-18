@@ -171,8 +171,9 @@
     - name: Clone postgres-websockets repository
       when: pw_binary.stat.exists == False
       git:
-        repo: https://github.com/diogob/postgres-websockets.git
+        repo: https://github.com/Rembane/postgres-websockets.git
         dest: /setup/postgres-websockets
+        version: read-conf-from-env
     - name: Compile and install postgres-websockets
       when: pw_binary.stat.exists == False
       shell: stack install --local-bin-path /usr/local/bin
