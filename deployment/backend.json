@@ -2,10 +2,10 @@
   "builders": [
     {
       "type": "docker",
-      "image": "lemmingpants-backend:latest",
+      "image": "ubuntu",
       "commit": true,
       "pull": false,
-      "changes": ["WORKDIR /", "EXPOSE 3000 8000"]
+      "changes": ["WORKDIR /"]
     }
   ],
 
