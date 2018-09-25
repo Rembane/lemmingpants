@@ -2,7 +2,7 @@ all: package
 
 .PHONY: dev compile package all styles clean test
 
-DIRS := $(shell find output/ -name '*.js')
+DIRS = $(shell find output/ -name '*.js')
 
 package: compile
 	cat main.js | closure-compiler > main2.js
@@ -20,8 +20,9 @@ styles:
 
 install-dependencies:
 	psc-package install
+	psc-package build
 
-test:
+test: install-dependencies
 	@echo "Compiling..."
 	@purs bundle ${DIRS} -o test.js --main Test.Main -m Test.Main
 	cat test.js | node
