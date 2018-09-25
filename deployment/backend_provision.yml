@@ -180,23 +180,6 @@
       args:
         chdir: /setup/postgres-websockets
 
-- name: Compile Lemmingtools
-  hosts: all
-  tasks:
-    - name: Is lemmingtools installed?
-      stat: path=/usr/local/bin/lemmingtools-exe
-      register: lemmingtools_binary
-    - name: Clone Lemmingpants
-      when: lemmingtools_binary.stat.exists == False
-      git:
-        repo: https://github.com/Rembane/lemmingpants.git
-        dest: /setup/lemmingpants
-    - name: Compile and install lemmingtools
-      when: lemmingtools_binary.stat.exists == False
-      shell: stack install --local-bin-path /usr/local/bin
-      args:
-        chdir: /setup/lemmingpants/lemmingtools
-
 - name: Initialize the database
   hosts: all
   become: yes
