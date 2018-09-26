@@ -1,13 +1,30 @@
 module Lemmingpants where
 
+import Prelude
+
 import Components.Admin as CA
 import Components.Home as CH
 import Components.Login as CL
 import Components.Overhead as CO
 import Components.Registration as CR
+
+import Halogen as H
+import Halogen.Component.ChildPath as CP
+import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
+
+import Data.Array as A
+
+import Types.Agenda as AG
+import Types.Attendee as AT
+import Types.Flash as FL
+import Types.Speaker as S
+import Types.SpeakerQueue as SQ
+import Types.Token as TT
+
 import Control.Alt ((<|>))
 import Control.Monad.Except (except, runExcept)
-import Data.Array as A
 import Data.Either (Either(..), note)
 import Data.Either.Nested (Either5)
 import Data.Foldable (foldMap)
@@ -16,29 +33,15 @@ import Data.Lens (over, set, traverseOf)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
-import Data.Monoid (mempty)
 import Data.String (toLower)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign (F, Foreign, ForeignError(..), fail, renderForeignError, unsafeFromForeign)
-import Halogen as H
-import Halogen.Component.ChildPath as CP
-import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties as HP
-import Prelude (class Show, type (~>), Unit, Void, bind, discard, const, pure, show, unit, ($), (*>), (<#>), (<$), (<<<), (<>), (=<<), (==), (>>=))
 import Routing.Match (Match, lit)
 import Simple.JSON (read', readImpl)
 import Type.Prelude (SProxy(..))
-import Types.Agenda (Agenda, AgendaItem(AgendaItem), _AgendaItems, _SpeakerQueues)
-import Types.Agenda as AG
-import Types.Attendee (Attendee, AttendeeDB, insertAttendee)
-import Types.Flash as FL
 import Types.Lens (_withId)
-import Types.Speaker as S
-import Types.SpeakerQueue (SpeakerQueue(SpeakerQueue), _Speakers)
-import Types.Token (Payload(..), Token(..), removeToken, saveToken)
 import Web.HTML (Window)
 
 type ChildQuery = Coproduct5 CR.Query CO.Query CA.Query CL.Query CH.Query
@@ -73,10 +76,10 @@ locations
 
 type State =
   { currentLocation :: Location
-  , token           :: Token
+  , token           :: TT.Token
   , flash           :: Maybe FL.Flash
-  , agenda          :: Agenda
-  , attendees       :: AttendeeDB
+  , agenda          :: AG.Agenda
+  , attendees       :: AT.AttendeeDB
   , showRegForm     :: Boolean
   , window          :: Window
   }
@@ -89,7 +92,7 @@ data Query a
   | RegistrationMsg CR.Message a
   | WSMsg           Foreign    a
 
-type Input = { token :: Token, agenda :: Agenda, attendees :: AttendeeDB, window :: Window }
+type Input = { token :: TT.Token, agenda :: AG.Agenda, attendees :: AT.AttendeeDB, window :: Window }
 
 component :: H.Component HH.HTML Query Input Void Aff
 component =
@@ -134,8 +137,8 @@ component =
           :: State
           -> H.ParentHTML Query ChildQuery ChildSlot Aff
         loginlogoutlink s =
-          let (Token t)   = s.token
-              (Payload p) = t.payload
+          let (TT.Token {payload}) = s.token
+              (TT.Payload p)       = payload
            in if p.role == "admin_user"
                 -- Blergh... hack... blergh...
                 -- TODO: Unhack this!
@@ -175,7 +178,7 @@ component =
           H.modify (_ {currentLocation = l, flash = Nothing, showRegForm = true}) *> pure next
         SignOut      next -> do
           s <- H.get
-          H.liftAff (removeToken s.window)
+          H.liftAff (TT.removeToken s.window)
           pure next
         AdminMsg   m next ->
           case m of
@@ -184,7 +187,7 @@ component =
           case m of
             CL.NewToken t -> do
               s <- H.modify (_ {token = t})
-              H.liftAff (saveToken s.window t)
+              H.liftAff (TT.saveToken s.window t)
               pure next
             CL.Flash s -> flash s next
         RegistrationMsg m next ->
@@ -237,16 +240,16 @@ component =
             go Insert air ag = pure (AG.insert (newAI air) ag)
             go Update air ag =
               except (note (pure (ForeignError "ERROR: handleAgendaItem: Could not update AgendaItem!"))
-                (traverseOf (_AgendaItems <<< _withId air.id) (\(AgendaItem x) ->
-                  Just $ set (_Newtype <<< prop (SProxy :: SProxy "speakerQueues")) x.speakerQueues (newAI air))
+                (traverseOf (AG._AgendaItems <<< _withId air.id) (\(AG.AgendaItem {speakerQueues}) ->
+                  Just $ set (_Newtype <<< prop (SProxy :: SProxy "speakerQueues")) speakerQueues (newAI air))
                   ag))
 
             newAI { id, supertitle, title, order_, state } =
-              AgendaItem { id, supertitle, title, order_, state, speakerQueues: mempty }
+              AG.AgendaItem { id, supertitle, title, order_, state, speakerQueues: mempty }
 
-        handleAttendee :: F Attendee -> State -> F State
+        handleAttendee :: F AT.Attendee -> State -> F State
         handleAttendee fr state =
-            fr <#> \at -> state { attendees = insertAttendee at state.attendees }
+            fr <#> \at -> state { attendees = AT.insertAttendee at state.attendees }
 
         handleSpeaker
           :: F { id               :: Int
@@ -264,12 +267,12 @@ component =
             except (note
               (pure (ForeignError ("Modifying the speaker failed.")))
               (traverseOf
-                (prop (SProxy :: SProxy "agenda") <<< _AgendaItems <<< _withId r.agenda_item_id <<< _SpeakerQueues <<< _withId r.speaker_queue_id)
+                (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId r.agenda_item_id <<< AG._SpeakerQueues <<< _withId r.speaker_queue_id)
                 (Just <<< go action r)
                 st))
           where
-            go Insert r = over _Speakers $ A.insert $ newSpeaker r
-            go Update r = set (_Speakers <<< _withId r.id) (newSpeaker r)
+            go Insert r = over SQ._Speakers $ A.insert $ newSpeaker r
+            go Update r = set (SQ._Speakers <<< _withId r.id) (newSpeaker r)
 
             newSpeaker {id, attendee_id, state, times_spoken} =
               let ts = fromMaybe 0 times_spoken
@@ -287,9 +290,9 @@ component =
           r >>= \{id, agenda_item_id, state} ->
           except (note
             (pure (ForeignError "Modifying the speaker queue failed."))
-            (traverseOf (prop (SProxy :: SProxy "agenda") <<< _AgendaItems <<< _withId agenda_item_id) (go action {id, state}) s))
+            (traverseOf (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId agenda_item_id) (go action {id, state}) s))
           where
-            go Insert {id, state} ai = Just $ AG.pushSQ (SpeakerQueue {id, state, speakers: mempty}) ai
+            go Insert {id, state} ai = Just $ AG.pushSQ (SQ.SpeakerQueue {id, state, speakers: mempty}) ai
             go Update {id, state} ai =
               if state == "done"
                 then AG.popSQIfMatchingId id ai
