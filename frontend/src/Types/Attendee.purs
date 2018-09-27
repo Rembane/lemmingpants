@@ -6,18 +6,20 @@ module Types.Attendee
   , getAttendeeById
   , getAttendeeByNumber
   , insertAttendee
+  , listAttendees
   ) where
 
 import Data.Array as A
 import Data.Foldable (foldr)
+import Data.List as L
 import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.Newtype (class Newtype)
-import Record (modify)
 import Data.String (Pattern(..), split)
 import Data.Tuple (Tuple(..))
 import Prelude (class Eq, map, ($), (<#>), (<>), (>>=), (>>>))
+import Record (modify)
 import Simple.JSON (class ReadForeign, readImpl)
 import Type.Prelude (SProxy(..))
 
@@ -74,3 +76,6 @@ insertAttendee a@(Attendee a') (AttendeeDB db) = AttendeeDB $
   db { idToAttendee = M.insert a'.id a db.idToAttendee
      , numberToId   = foldr (\n acc -> M.insert n a'.id acc) db.numberToId a'.numbers
      }
+
+listAttendees :: AttendeeDB -> L.List Attendee
+listAttendees (AttendeeDB {idToAttendee}) = M.values idToAttendee
