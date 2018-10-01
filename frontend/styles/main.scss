@@ -24,10 +24,11 @@ nav {
   menu {
     @include margin(null auto 1em auto);
     @include padding(0.5em $base-spacing);
+    @include clearfix;
     max-width: 720px;
 
     li {
-      display: inline-block;
+      float: left;
       margin-left: 1em;
 
       &:first-child {
