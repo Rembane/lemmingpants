@@ -1,6 +1,9 @@
 module Lemmingpants where
 
+import Prelude
+
 import Components.Admin as CA
+import Components.Admin.ListAttendees as CAL
 import Components.Home as CH
 import Components.Login as CL
 import Components.Overhead as CO
@@ -9,14 +12,13 @@ import Control.Alt ((<|>))
 import Control.Monad.Except (except, runExcept)
 import Data.Array as A
 import Data.Either (Either(..), note)
-import Data.Either.Nested (Either5)
+import Data.Either.Nested (Either6)
 import Data.Foldable (foldMap)
-import Data.Functor.Coproduct.Nested (Coproduct5)
+import Data.Functor.Coproduct.Nested (Coproduct6)
 import Data.Lens (over, set, traverseOf)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
-import Data.Monoid (mempty)
 import Data.String (toLower)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -27,22 +29,21 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Prelude (class Show, type (~>), Unit, Void, bind, discard, const, pure, show, unit, ($), (*>), (<#>), (<$), (<<<), (<>), (=<<), (==), (>>=))
 import Routing.Match (Match, lit)
 import Simple.JSON (read', readImpl)
 import Type.Prelude (SProxy(..))
-import Types.Agenda (Agenda, AgendaItem(AgendaItem), _AgendaItems, _SpeakerQueues)
 import Types.Agenda as AG
-import Types.Attendee (Attendee, AttendeeDB, insertAttendee)
+import Types.Attendee as AT
 import Types.Flash as FL
 import Types.Lens (_withId)
 import Types.Speaker as S
-import Types.SpeakerQueue (SpeakerQueue(SpeakerQueue), _Speakers)
-import Types.Token (Payload(..), Token(..), removeToken, saveToken)
+import Types.SpeakerQueue as SQ
+import Types.Token (Payload(..), Token(..))
+import Types.Token as TT
 import Web.HTML (Window)
 
-type ChildQuery = Coproduct5 CR.Query CO.Query CA.Query CL.Query CH.Query
-type ChildSlot  = Either5 Int Int Int Int Int
+type ChildQuery = Coproduct6 CR.Query CO.Query CA.Query CAL.Query CL.Query CH.Query
+type ChildSlot  = Either6 Int Int Int Int Int Int
 
 data WSAction
   = Insert
@@ -53,30 +54,35 @@ data Location
   | Registration
   | Overhead
   | Admin
+  | AdminListAttendees
   | Login
 
 instance shLoc :: Show Location where
-  show = case _ of
-           Home         -> "Home"
-           Registration -> "Registration"
-           Overhead     -> "Overhead"
-           Admin        -> "Admin"
-           Login        -> "Login"
+  show
+    = case _ of
+        Home               -> "Home"
+        Registration       -> "Registration"
+        Overhead           -> "Overhead"
+        Admin              -> "Admin"
+        AdminListAttendees -> "Admin: List attendees"
+        Login              -> "Login"
 
 locations :: Match Location
 locations
-  =   (Registration <$ lit "registration")
-  <|> (Overhead     <$ lit "overhead")
-  <|> (Admin        <$ lit "admin")
-  <|> (Login        <$ lit "login")
-  <|> (Home         <$ lit "")
+  =   (Registration       <$ lit "registration")
+  <|> (Overhead           <$ lit "overhead")
+  <|> (Admin              <$ lit "admin")
+  <|> (Admin              <$ lit "admin")
+  <|> (AdminListAttendees <$ lit "adminAttendees")
+  <|> (Login              <$ lit "login")
+  <|> (Home               <$ lit "")
 
 type State =
   { currentLocation :: Location
-  , token           :: Token
+  , token           :: TT.Token
   , flash           :: Maybe FL.Flash
-  , agenda          :: Agenda
-  , attendees       :: AttendeeDB
+  , agenda          :: AG.Agenda
+  , attendees       :: AT.AttendeeDB
   , showRegForm     :: Boolean
   , window          :: Window
   }
@@ -89,7 +95,7 @@ data Query a
   | RegistrationMsg CR.Message a
   | WSMsg           Foreign    a
 
-type Input = { token :: Token, agenda :: Agenda, attendees :: AttendeeDB, window :: Window }
+type Input = { token :: TT.Token, agenda :: AG.Agenda, attendees :: AT.AttendeeDB, window :: Window }
 
 component :: H.Component HH.HTML Query Input Void Aff
 component =
@@ -116,13 +122,20 @@ component =
       HH.div
         [ HP.id_ (toLower (show state.currentLocation)) ]
         [ HH.nav_
-          [ HH.menu_
-            [ HH.li_ [HH.a [HP.href "#/"]            [HH.text "Home"]]
+          [ HH.menu_ (
+            [ HH.li_ [HH.a [HP.href "#"]             [HH.text "Home"]]
             , HH.li_ [HH.a [HP.href "#registration"] [HH.text "Registration"]]
             , HH.li_ [HH.a [HP.href "#overhead"]     [HH.text "Overhead"]]
-            , HH.li_ [HH.a [HP.href "#admin"]        [HH.text "Admin"]]
-            , loginlogoutlink state
-            ]
+            ] <> (if pl.role == "admin_user"
+                   then [ HH.li_
+                      [ HH.a [HP.href "#admin"] [HH.text "Admin"]
+                      , HH.menu
+                        [ HP.id_ "submenu" ]
+                        [ HH.li_ [ HH.a [HP.href "#adminAttendees"] [HH.text "List attendees"] ] ]
+                      ]
+                    ]
+                    else mempty)
+            <> [ loginlogoutlink state ])
           ]
         , HH.div
           [HP.class_ (HH.ClassName "container")]
@@ -130,12 +143,14 @@ component =
             <> [locationToSlot state.currentLocation state])
         ]
       where
+        (Payload pl) = let (Token t) = state.token in t.payload
+
         loginlogoutlink
           :: State
           -> H.ParentHTML Query ChildQuery ChildSlot Aff
         loginlogoutlink s =
-          let (Token t)   = s.token
-              (Payload p) = t.payload
+          let (TT.Token {payload}) = s.token
+              (TT.Payload p)       = payload
            in if p.role == "admin_user"
                 -- Blergh... hack... blergh...
                 -- TODO: Unhack this!
@@ -148,25 +163,27 @@ component =
           -> H.ParentHTML Query ChildQuery ChildSlot Aff
         locationToSlot l s =
           case l of
-            Registration -> go CP.cp1 1 CR.component rs   (HE.input RegistrationMsg)
-            Overhead     -> go CP.cp2 2 CO.component ohs  (const Nothing)
-            Admin        -> go CP.cp3 3 CA.component s'   (HE.input AdminMsg)
-            Login        -> go CP.cp4 4 CL.component ls   (HE.input LoginMsg)
-            Home         -> go CP.cp5 5 CH.component unit (const Nothing)
+            Registration       -> go CP.cp1 1 CR.component  rs   (HE.input RegistrationMsg)
+            Overhead           -> go CP.cp2 2 CO.component  ohs  (const Nothing)
+            Admin              -> go CP.cp3 3 CA.component  s'   (HE.input AdminMsg)
+            AdminListAttendees -> go CP.cp4 4 CAL.component alas (const Nothing)
+            Login              -> go CP.cp5 5 CL.component  ls   (HE.input LoginMsg)
+            Home               -> go CP.cp6 6 CH.component  unit (const Nothing)
           where
             go :: forall g i o
-             . CP.ChildPath g ChildQuery Int ChildSlot
-            -> Int
-            -> H.Component HH.HTML g i o Aff
-            -> i
-            -> (o -> Maybe (Query Unit))
-            -> H.ParentHTML Query ChildQuery ChildSlot Aff
+               . CP.ChildPath g ChildQuery Int ChildSlot
+              -> Int
+              -> H.Component HH.HTML g i o Aff
+              -> i
+              -> (o -> Maybe (Query Unit))
+              -> H.ParentHTML Query ChildQuery ChildSlot Aff
             go cp p c i f = HH.slot' cp p c i f
 
-            ls  = { token: s.token }
-            rs  = { token: s.token, showForm: s.showRegForm }
-            s'  = { token: s.token, agenda: s.agenda, attendees: s.attendees }
-            ohs = { agenda: s.agenda, attendees: s.attendees }
+            ls   = { token: s.token }
+            rs   = { token: s.token, showForm: s.showRegForm }
+            s'   = { token: s.token, agenda: s.agenda, attendees: s.attendees }
+            ohs  = { agenda: s.agenda, attendees: s.attendees }
+            alas = { attendees: s.attendees }
 
     eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void Aff
     eval =
@@ -175,7 +192,7 @@ component =
           H.modify (_ {currentLocation = l, flash = Nothing, showRegForm = true}) *> pure next
         SignOut      next -> do
           s <- H.get
-          H.liftAff (removeToken s.window)
+          H.liftAff (TT.removeToken s.window)
           pure next
         AdminMsg   m next ->
           case m of
@@ -184,7 +201,7 @@ component =
           case m of
             CL.NewToken t -> do
               s <- H.modify (_ {token = t})
-              H.liftAff (saveToken s.window t)
+              H.liftAff (TT.saveToken s.window t)
               pure next
             CL.Flash s -> flash s next
         RegistrationMsg m next ->
@@ -237,16 +254,16 @@ component =
             go Insert air ag = pure (AG.insert (newAI air) ag)
             go Update air ag =
               except (note (pure (ForeignError "ERROR: handleAgendaItem: Could not update AgendaItem!"))
-                (traverseOf (_AgendaItems <<< _withId air.id) (\(AgendaItem x) ->
-                  Just $ set (_Newtype <<< prop (SProxy :: SProxy "speakerQueues")) x.speakerQueues (newAI air))
+                (traverseOf (AG._AgendaItems <<< _withId air.id) (\(AG.AgendaItem {speakerQueues}) ->
+                  Just $ set (_Newtype <<< prop (SProxy :: SProxy "speakerQueues")) speakerQueues (newAI air))
                   ag))
 
             newAI { id, supertitle, title, order_, state } =
-              AgendaItem { id, supertitle, title, order_, state, speakerQueues: mempty }
+              AG.AgendaItem { id, supertitle, title, order_, state, speakerQueues: mempty }
 
-        handleAttendee :: F Attendee -> State -> F State
+        handleAttendee :: F AT.Attendee -> State -> F State
         handleAttendee fr state =
-            fr <#> \at -> state { attendees = insertAttendee at state.attendees }
+            fr <#> \at -> state { attendees = AT.insertAttendee at state.attendees }
 
         handleSpeaker
           :: F { id               :: Int
@@ -264,12 +281,12 @@ component =
             except (note
               (pure (ForeignError ("Modifying the speaker failed.")))
               (traverseOf
-                (prop (SProxy :: SProxy "agenda") <<< _AgendaItems <<< _withId r.agenda_item_id <<< _SpeakerQueues <<< _withId r.speaker_queue_id)
+                (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId r.agenda_item_id <<< AG._SpeakerQueues <<< _withId r.speaker_queue_id)
                 (Just <<< go action r)
                 st))
           where
-            go Insert r = over _Speakers $ A.insert $ newSpeaker r
-            go Update r = set (_Speakers <<< _withId r.id) (newSpeaker r)
+            go Insert r = over SQ._Speakers $ A.insert $ newSpeaker r
+            go Update r = set (SQ._Speakers <<< _withId r.id) (newSpeaker r)
 
             newSpeaker {id, attendee_id, state, times_spoken} =
               let ts = fromMaybe 0 times_spoken
@@ -287,9 +304,9 @@ component =
           r >>= \{id, agenda_item_id, state} ->
           except (note
             (pure (ForeignError "Modifying the speaker queue failed."))
-            (traverseOf (prop (SProxy :: SProxy "agenda") <<< _AgendaItems <<< _withId agenda_item_id) (go action {id, state}) s))
+            (traverseOf (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId agenda_item_id) (go action {id, state}) s))
           where
-            go Insert {id, state} ai = Just $ AG.pushSQ (SpeakerQueue {id, state, speakers: mempty}) ai
+            go Insert {id, state} ai = Just $ AG.pushSQ (SQ.SpeakerQueue {id, state, speakers: mempty}) ai
             go Update {id, state} ai =
               if state == "done"
                 then AG.popSQIfMatchingId id ai

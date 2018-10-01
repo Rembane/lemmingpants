@@ -24,11 +24,14 @@ nav {
   menu {
     @include margin(null auto 1em auto);
     @include padding(0.5em $base-spacing);
+    @include clearfix;
     max-width: 720px;
+    background-color: #333;
 
     li {
-      display: inline-block;
+      float: left;
       margin-left: 1em;
+      position: relative;
 
       &:first-child {
         margin-left: 0;
@@ -37,6 +40,15 @@ nav {
         text-decoration: none;
         font-weight: bold;
         color: #fff;
+      }
+      menu#submenu {
+        display: none;
+        position: absolute;
+        left: 0;
+      }
+      &:hover menu#submenu,
+      & menu#submenu:hover {
+        display: block;
       }
     }
   }
