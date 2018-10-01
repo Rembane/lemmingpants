@@ -13,7 +13,7 @@ import Data.Array as A
 import Data.Foldable (foldr)
 import Data.List as L
 import Data.Map as M
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Monoid (mempty)
 import Data.Newtype (class Newtype)
 import Data.String (Pattern(..), split)
@@ -46,12 +46,11 @@ instance rfAt :: ReadForeign Attendee where
 
 visualizeAttendee :: Attendee -> String
 visualizeAttendee (Attendee a) =
-  case a.nick of
-    Nothing -> a.name
-    Just n  ->
-      case A.uncons (split (Pattern " ") a.name) of
-        Nothing           -> a.name
-        Just {head, tail} -> A.intercalate " " ([head] <> ["”" <> n <> "”"] <> tail)
+  fromMaybe
+    a.name
+    (a.nick
+      >>= \nick -> A.uncons (split (Pattern " ") a.name)
+      <#> \{head, tail} -> A.intercalate " " ([head, "”" <> nick <> "”"] <> tail))
 
 newtype AttendeeDB = AttendeeDB
   { idToAttendee :: M.Map Int Attendee
