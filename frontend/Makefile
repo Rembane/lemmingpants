@@ -24,6 +24,7 @@ install-dependencies:
 
 test: install-dependencies
 	@echo "Compiling..."
+	@psc-package build test/Main.purs
 	@purs bundle ${DIRS} -o test.js --main Test.Main -m Test.Main
 	cat test.js | node
 
