@@ -23,14 +23,14 @@ import Data.String (toLower)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
-import Foreign (F, Foreign, ForeignError(..), fail, renderForeignError, unsafeFromForeign)
+import Foreign (F, Foreign, ForeignError(..), fail, readString, renderForeignError, unsafeFromForeign)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Routing.Match (Match, lit)
-import Simple.JSON (read', readImpl)
+import Simple.JSON (readImpl, readJSON')
 import Type.Prelude (SProxy(..))
 import Types.Agenda as AG
 import Types.Attendee as AT
@@ -209,9 +209,17 @@ component =
             CR.FrmVsbl b -> H.modify (\s -> s { showRegForm = b }) *> pure next
             CR.Flash   s -> flash s next
         WSMsg fr next -> do
+          -- Log the message to the console.
           liftEffect $ log $ unsafeFromForeign fr
           state <- H.get
-          case runExcept (dispatcher state =<< read' fr) of
+          -- In case you think this is inefficient and want to change
+          -- `readJSON' =<< readString` into `read'`, do know that
+          -- there is a bug that makes the parsing fail if you only
+          -- run read' on your foreign data. I don't know why, but I
+          -- intend to find out.
+          --
+          -- Regards, A.
+          case runExcept (dispatcher state =<< readJSON' =<< readString fr) of
             Left  es -> flash (FL.mkFlash (foldMap renderForeignError es) FL.Error) next
             Right s' -> H.put s' *> pure next
       where
