@@ -1,5 +1,7 @@
 module Components.SpeakerQueue where
 
+import Prelude 
+
 import Components.Forms as F
 import Components.Forms.Field (mkField)
 import Data.Array as A
@@ -19,13 +21,16 @@ import Affjax.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, discard, identity, map, pure, show, unit, ($), (*>), (/=), (<<<), (<=), (<>), (==))
 import Simple.JSON (class WriteForeign, readJSON)
 import Types.Attendee (Attendee(..), AttendeeDB, getAttendeeByNumber)
 import Types.Flash as FL
 import Types.Speaker as S
 import Types.SpeakerQueue (SpeakerQueue(..), _Speakers, _Speaking)
 import Types.Token (Token)
+import Types.KPUpdates
+import Web.Event.Event (Event)
+
+foreign import myEvent :: Event
 
 type State =
   { agendaItemId :: Int
@@ -33,6 +38,7 @@ type State =
   , token        :: Token
   , attendees    :: AttendeeDB
   , sqHeight     :: Int
+  , keyboardMsg  :: Maybe KPUpdates
   }
 
 data Query a
@@ -211,7 +217,19 @@ component =
             204
             "SpeakerQueue.Delete -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           pure next
-        GotNewState s next -> H.put s *> pure next
+        GotNewState s next -> case s.keyboardMsg of
+          Nothing   -> H.put s *> pure next
+          Just kmsg -> case kmsg of 
+            NextSpeaker       -> H.put (s { keyboardMsg = Nothing }) *> eval (H.action Next)  *> pure next
+            EjectSpeaker      -> H.put (s { keyboardMsg = Nothing }) *> eval (H.action Eject) *> pure next
+            AddSpeakerToQueue -> H.put (s { keyboardMsg = Nothing }) *> H.query unit (H.action (F.SubmitForm myEvent)) *> pure next
+            _                 -> pure next
+
+
+
+  -- = NextSpeaker
+  -- | EjectSpeaker
+  -- | AddSpeakerToQueue
 
 ajaxHelper
   :: forall r

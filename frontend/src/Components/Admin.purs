@@ -19,12 +19,15 @@ import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
 import Types.Flash as FL
 import Types.Token (Payload(..), Token(..))
+import Types.KPUpdates
 
 type State =
-  { agenda    :: Agenda
-  , token     :: Token
-  , attendees :: AttendeeDB
+  { agenda      :: Agenda
+  , token       :: Token
+  , attendees   :: AttendeeDB
+  , keyboardMsg :: Maybe KPUpdates
   }
+
 type Input = State
 
 data Query a
@@ -74,6 +77,7 @@ component =
                           , attendees:    state.attendees
                           , agendaItemId: id
                           , sqHeight:     L.length speakerQueues
+                          , keyboardMsg:  state.keyboardMsg
                           }
                           (HE.input SQMsg)
                   ])
@@ -103,7 +107,12 @@ component =
         SQMsg (SQ.Flash m) next ->
           H.raise (Flash m) *> pure next
         GotNewState s next ->
-          H.put s *> pure next
+          case s.keyboardMsg of
+            Nothing   -> H.put s *> pure next
+            Just kmsg -> case kmsg of 
+              NextAgendaItem     -> H.put (s { keyboardMsg = Nothing }) *> eval (H.action NextAI) *> pure next
+              PreviousAgendaItem -> H.put (s { keyboardMsg = Nothing }) *> eval (H.action PreviousAI) *> pure next
+              _                  -> pure next
 
     step
       :: (Agenda -> Maybe Agenda)
