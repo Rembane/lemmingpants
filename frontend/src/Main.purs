@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 import Affjax as AX
 import Affjax.ResponseFormat as Res
 import Control.Apply (lift3)
@@ -23,7 +25,6 @@ import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
 import Lemmingpants as LP
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, discard, pure, unit, void, ($), (*), (*>), (<#>), (<$>), (<*>), (<<<), (<>), (>), (>>=), (=<<))
 import Routing.Hash (matches)
 import Simple.JSON (readJSON)
 import Types.Agenda (Agenda)
@@ -33,8 +34,8 @@ import Types.Token (Payload(..), Token(..), loadToken, removeToken, saveToken)
 import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML (Window, window)
 import Web.Socket.Event.EventTypes (onMessage)
-import Web.Socket.Event.MessageEvent (data_, fromEvent)
-import Web.Socket.WebSocket (create, toEventTarget)
+import Web.Socket.Event.MessageEvent (data_, fromEvent) as ME
+import Web.Socket.WebSocket as WS
 
 parseAgenda :: String -> Either MultipleErrors Agenda
 parseAgenda = readJSON
@@ -109,10 +110,10 @@ main = do
       Right st -> do
         connection <-
           let (Token t') = st.token
-           in liftEffect $ create (PG.createWSURL $ "/state_updates/" <> t'.raw) []
+           in liftEffect $ WS.create (PG.createWSURL $ "/state_updates/" <> t'.raw) []
         driver <- runUI LP.component st body
         liftEffect $ do
-          sendMsg <- eventListener (\e -> launchAff_ $ fromMaybe (pure unit) (driver.query <<< H.action <<< LP.WSMsg <<< data_ <$> fromEvent e))
-          addEventListener onMessage sendMsg false (toEventTarget connection)
+          sendMsg <- eventListener (\e -> launchAff_ $ fromMaybe (pure unit) (driver.query <<< H.action <<< LP.WSMsg <<< ME.data_ <$> ME.fromEvent e))
+          addEventListener onMessage sendMsg false (WS.toEventTarget connection)
           void (matches LP.locations (const (launchAff_ <<< driver.query <<< H.action <<< LP.ChangePage)))
 
