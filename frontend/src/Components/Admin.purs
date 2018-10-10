@@ -1,50 +1,71 @@
 module Components.Admin where
 
+import Prelude
+
+import Affjax.StatusCode (StatusCode(..))
 import Components.SpeakerQueue as SQ
-import Effect.Aff (Aff)
 import Data.Either (Either(..), either, note)
+import Data.Function.Uncurried (Fn1, runFn1)
 import Data.HTTP.Method (Method(..))
 import Data.List as L
 import Data.Maybe (Maybe(Nothing, Just))
+import Data.Traversable (sequence)
+import Effect (Effect)
+import Effect.Aff (Aff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Affjax.StatusCode (StatusCode(..))
+import Halogen.Query.EventSource as ES
 import Postgrest (createURL)
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, identity, pure, unit, ($), (*>), (<>), (==), (>>=))
 import Types.Agenda (Agenda, AgendaItem(..))
 import Types.Agenda as AG
 import Types.Attendee (AttendeeDB)
 import Types.Flash as FL
 import Types.Token (Payload(..), Token(..))
-import Types.KPUpdates
+import Web.Event.Event (Event, preventDefault)
+import Web.Event.EventTarget (addEventListener, eventListener)
+import Web.HTML (window) as Web
+import Web.HTML.HTMLDocument as HTMLDocument
+import Web.HTML.Window (document) as Web
+import Web.UIEvent.KeyboardEvent (fromEvent, key)
+import Web.UIEvent.KeyboardEvent.EventTypes as KET
+
+foreign import setFocusImpl :: Fn1 String (Effect Unit)
+
+setFocus :: String -> Effect Unit
+setFocus = runFn1 setFocusImpl
 
 type State =
   { agenda      :: Agenda
   , token       :: Token
   , attendees   :: AttendeeDB
-  , keyboardMsg :: Maybe KPUpdates
   }
 
 type Input = State
 
 data Query a
-  = PreviousAI       a
-  | NextAI           a
-  | SQMsg SQ.Message a
-  | GotNewState State a
+  = Init                   a
+  | PreviousAI             a
+  | NextAI                 a
+  | SQMsg       SQ.Message a
+  | GotNewState State      a
+  | HandleKey   Event      a
+
+derive instance functorQuery :: Functor Query
 
 data Message
   = Flash FL.Flash
 
 component :: H.Component HH.HTML Query Input Message Aff
 component =
-  H.parentComponent
+  H.lifecycleParentComponent
     { initialState: identity
     , render
     , eval
+    , initializer: Just (H.action Init)
+    , finalizer: Nothing
     , receiver: HE.input GotNewState
     }
   where
@@ -77,7 +98,6 @@ component =
                           , attendees:    state.attendees
                           , agendaItemId: id
                           , sqHeight:     L.length speakerQueues
-                          , keyboardMsg:  state.keyboardMsg
                           }
                           (HE.input SQMsg)
                   ])
@@ -100,6 +120,16 @@ component =
     eval :: Query ~> H.ParentDSL State Query SQ.Query Unit Message Aff
     eval =
       case _ of
+        Init next -> do
+          document <- H.liftEffect $ Web.document =<< Web.window
+          H.liftEffect $ setFocus "id"
+          H.subscribe $ ES.eventSource
+            (\f -> do
+              el <- eventListener (f <<< H.action <<< HandleKey)
+              addEventListener (KET.keydown) el true (HTMLDocument.toEventTarget document)
+            )
+            (pure <<< map (const ES.Listening))
+          pure next
         PreviousAI next ->
            step AG.prev *> pure next
         NextAI next ->
@@ -107,20 +137,25 @@ component =
         SQMsg (SQ.Flash m) next ->
           H.raise (Flash m) *> pure next
         GotNewState s next ->
-          case s.keyboardMsg of
-            Nothing   -> H.put s *> pure next
-            Just kmsg -> case kmsg of 
-              NextAgendaItem     -> H.put (s { keyboardMsg = Nothing }) *> eval (H.action NextAI) *> pure next
-              PreviousAgendaItem -> H.put (s { keyboardMsg = Nothing }) *> eval (H.action PreviousAI) *> pure next
-              _                  -> pure next
+          H.put s *> pure next
+        HandleKey ev next ->
+          let p  = const (H.liftEffect $ preventDefault ev)
+              go =
+                case _ of
+                  "n" -> p unit *> H.query unit (H.action SQ.Next)  *> pure next -- Next speaker
+                  "e" -> p unit *> H.query unit (H.action SQ.Eject) *> pure next -- Eject speaker
+                  "h" -> p unit *> step AG.prev *> pure next -- Previous agenda item
+                  "l" -> p unit *> step AG.next *> pure next -- Next agenda item
+                  _   -> pure next
+           in sequence (fromEvent ev <#> (key >>> go)) *> pure next
 
     step
       :: (Agenda -> Maybe Agenda)
       -> H.HalogenM State Query SQ.Query Unit Message Aff Unit
     step f =
       H.get
-        >>= \s ->
-            setCurrentAgendaItem ((note "ERROR: Agenda: Out of bounds step." (f s.agenda)) >>= AG.getCurrentAI)
+        >>= \{agenda} ->
+            setCurrentAgendaItem ((note "ERROR: Agenda: Out of bounds step." (f agenda)) >>= AG.getCurrentAI)
 
     setCurrentAgendaItem
       :: Either String AgendaItem

@@ -41,7 +41,6 @@ import Types.SpeakerQueue as SQ
 import Types.Token (Payload(..), Token(..))
 import Types.Token as TT
 import Web.HTML (Window)
-import Types.KPUpdates
 
 type ChildQuery = Coproduct6 CR.Query CO.Query CA.Query CAL.Query CL.Query CH.Query
 type ChildSlot  = Either6 Int Int Int Int Int Int
@@ -57,8 +56,6 @@ data Location
   | Admin
   | AdminListAttendees
   | Login
-
-  
 
 instance shLoc :: Show Location where
   show
@@ -88,7 +85,6 @@ type State =
   , attendees       :: AT.AttendeeDB
   , showRegForm     :: Boolean
   , window          :: Window
-  , keyboardMsg     :: Maybe KPUpdates
   }
 
 data Query a
@@ -98,7 +94,6 @@ data Query a
   | LoginMsg        CL.Message a
   | RegistrationMsg CR.Message a
   | WSMsg           Foreign    a
-  | KeyboardMsg     KPUpdates  a
 
 type Input = { token :: TT.Token, agenda :: AG.Agenda, attendees :: AT.AttendeeDB, window :: Window }
 
@@ -120,7 +115,6 @@ component =
       , attendees:       i.attendees
       , showRegForm:     true
       , window:          i.window
-      , keyboardMsg:     Nothing
       }
 
     render :: State -> H.ParentHTML Query ChildQuery ChildSlot Aff
@@ -187,7 +181,7 @@ component =
 
             ls   = { token: s.token }
             rs   = { token: s.token, showForm: s.showRegForm }
-            s'   = { token: s.token, agenda: s.agenda, attendees: s.attendees, keyboardMsg: s.keyboardMsg }
+            s'   = { token: s.token, agenda: s.agenda, attendees: s.attendees }
             ohs  = { agenda: s.agenda, attendees: s.attendees }
             alas = { attendees: s.attendees }
 
@@ -228,8 +222,6 @@ component =
           case runExcept (dispatcher state =<< readJSON' =<< readString fr) of
             Left  es -> flash (FL.mkFlash (foldMap renderForeignError es) FL.Error) next
             Right s' -> H.put s' *> pure next
-        KeyboardMsg k next -> do
-          H.modify (\s -> s { keyboardMsg = pure k }) *> pure next
       where
         flash s next =
           H.modify (_ {flash = Just s})

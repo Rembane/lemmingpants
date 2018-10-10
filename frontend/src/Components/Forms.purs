@@ -19,6 +19,7 @@ type State = Unit
 
 data Query a
   = SubmitForm Event a
+  | ClearForm        a
 
 data Message = FormSubmitted (Object String)
 
@@ -64,3 +65,5 @@ component buttonLabel fields =
           >>> FormSubmitted
           >>> H.raise)
         *> pure next
+      ClearForm next ->
+        H.queryAll (H.action (F.UpdateField "")) *> pure next

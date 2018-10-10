@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 import Affjax as AX
 import Affjax.ResponseFormat as Res
 import Control.Apply (lift3)
@@ -8,7 +10,7 @@ import Data.DateTime.Instant (instant)
 import Data.Either (Either(Right, Left), either)
 import Data.Foldable (foldMap)
 import Data.Int (toNumber)
-import Data.Maybe (fromMaybe, maybe, Maybe(..))
+import Data.Maybe (fromMaybe, maybe)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple.Nested (Tuple3, get1, get2, get3, tuple3)
 import Data.Validation.Semigroup (V, invalid, unV)
@@ -23,7 +25,6 @@ import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
 import Lemmingpants as LP
 import Postgrest as PG
-import Prelude (type (~>), Unit, bind, const, discard, pure, unit, void, ($), (*), (*>), (<#>), (<$>), (<*>), (<<<), (<>), (>), (>>=), (=<<))
 import Routing.Hash (matches)
 import Simple.JSON (readJSON)
 import Types.Agenda (Agenda)
@@ -35,20 +36,6 @@ import Web.HTML (Window, window)
 import Web.Socket.Event.EventTypes (onMessage)
 import Web.Socket.Event.MessageEvent (data_, fromEvent) as ME
 import Web.Socket.WebSocket as WS
-import Types.KPUpdates
-import Effect (Effect)
-import Effect.Console (log)
-import Web.DOM.Element (Element)
-import Web.DOM.ParentNode (QuerySelector(..), querySelector)
-import Web.Event.Event (EventType(..), Event)
-import Web.Event.EventTarget (EventListener, addEventListener, eventListener)
-import Web.HTML (window)
-import Web.HTML.HTMLElement (toParentNode, toEventTarget)
-import Web.HTML.HTMLFormElement (fromElement, fromHTMLElement, submit)
-import Web.HTML.Window (document)
-import Web.UIEvent.KeyboardEvent (fromEvent, key)
-
-
 
 parseAgenda :: String -> Either MultipleErrors Agenda
 parseAgenda = readJSON
@@ -112,58 +99,6 @@ loadInitialState = do
                   then (pure <<< pure) t
                   else removeToken w *> loadOrGetNewToken w -- The recursion hack!
 
--- keymain :: Effect Unit
--- keymain = do
---   doc <- document =<< window
---   melem <- querySelector (QuerySelector "body") (toParentNode doc) 
---   case melem of
---     Nothing -> log "Hittar ingen body, det är jätteilla"
---     Just el -> handle el
-
--- handle :: Element -> Effect Unit
--- handle elem = do 
-  -- el <- eventListener evListen
-  -- addEventListener (EventType "keydown") el true (toEventTarget elem)
-  
--- data KPUpdates 
-  -- = NextSpeaker
-  -- | EjectSpeaker
-  -- | AddSpeakerToQueue
-  -- | NextAgendaItem
-  -- | PreviousAgendaItem
-
-keyboardDispatcher :: forall t0 . { query :: LP.Query Unit -> Aff Unit | t0 } -> Event -> Effect Unit
-keyboardDispatcher driver ev = do 
-  case fromEvent ev of 
-    Nothing -> log "Något fel med events"
-    Just ke -> case key ke of
- --     "Enter" -> handleEnter
-      "n" -> go NextSpeaker
-      "e" -> go EjectSpeaker
-      "k" -> go PreviousAgendaItem
-      "l" -> go NextAgendaItem
-      k -> log ("annan knapp: " <> k)
-
-  where
-    go :: KPUpdates -> Effect Unit
-    go = launchAff_ <<< driver.query <<< H.action <<< LP.KeyboardMsg 
-    
--- maybeForm :: Effect (Maybe Element)
--- maybeForm = do
---   doc <- document =<< window
---   querySelector (QuerySelector "#id") (toParentNode doc)
-
--- handleEnter :: Effect Unit
--- handleEnter = do
---   mif <- maybeForm
---   case mif of
---     Nothing -> log "Hittade inget form"
---     Just ifl -> case fromElement ifl of
---       Nothing -> log "jobbigt"
---       Just i -> submit i
-
-
-
 main :: Effect Unit
 main = do
   log "Hello lemming!"
@@ -178,9 +113,6 @@ main = do
            in liftEffect $ WS.create (PG.createWSURL $ "/state_updates/" <> t'.raw) []
         driver <- runUI LP.component st body
         liftEffect $ do
-          el <- eventListener (keyboardDispatcher driver)
-          addEventListener (EventType "keydown") el true (toEventTarget body)
-          idField <- querySelector (QuerySelector "#id") (toParentNode body)
           sendMsg <- eventListener (\e -> launchAff_ $ fromMaybe (pure unit) (driver.query <<< H.action <<< LP.WSMsg <<< ME.data_ <$> ME.fromEvent e))
           addEventListener onMessage sendMsg false (WS.toEventTarget connection)
           void (matches LP.locations (const (launchAff_ <<< driver.query <<< H.action <<< LP.ChangePage)))

@@ -1,7 +1,8 @@
 module Components.SpeakerQueue where
 
-import Prelude 
+import Prelude
 
+import Affjax.StatusCode (StatusCode(..))
 import Components.Forms as F
 import Components.Forms.Field (mkField)
 import Data.Array as A
@@ -17,7 +18,6 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Affjax.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Postgrest (createURL)
 import Postgrest as PG
@@ -27,10 +27,6 @@ import Types.Flash as FL
 import Types.Speaker as S
 import Types.SpeakerQueue (SpeakerQueue(..), _Speakers, _Speaking)
 import Types.Token (Token)
-import Types.KPUpdates
-import Web.Event.Event (Event)
-
-foreign import myEvent :: Event
 
 type State =
   { agendaItemId :: Int
@@ -38,7 +34,6 @@ type State =
   , token        :: Token
   , attendees    :: AttendeeDB
   , sqHeight     :: Int
-  , keyboardMsg  :: Maybe KPUpdates
   }
 
 data Query a
@@ -127,7 +122,7 @@ component =
             , HH.slot
                 unit
                 (F.component "Add speaker"
-                  [ mkField "id" "Speaker ID" [HP.type_ HP.InputNumber, HP.required true, HP.autocomplete false] ]
+                  [ mkField "id" "Speaker ID" [HP.type_ HP.InputNumber, HP.required true, HP.autocomplete false, HP.id_ "id"] ]
                 )
                 unit
                 (HE.input FormMsg)
@@ -178,32 +173,31 @@ component =
                         }
                       case r.status of
                         StatusCode 201 -> -- The `Created` HTTP status code.
-                          pure unit
+                          H.query unit (H.action F.ClearForm) *> pure unit
                         StatusCode 409 -> -- We can only have a visible speaker once per speaker queue.
                           H.raise $ Flash $ FL.mkFlash "I'm sorry, but you cannot add a speaker while it still is in the speaker queue." FL.Error
                         _ ->
                           H.raise $ Flash $ FL.mkFlash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
           *> pure next
         Next next -> do
-          state <- H.get
-          case preview (_Speakers <<< traversed <<< filtered (\(S.Speaker s) -> s.state /= S.Active)) state.speakerQueue of
-            Nothing            -> pure unit
-            Just (S.Speaker s) -> do
+          {speakerQueue} <- H.get
+          case preview (_Speakers <<< traversed <<< filtered (\(S.Speaker {state}) -> state /= S.Active)) speakerQueue of
+            Nothing               -> pure unit
+            Just (S.Speaker {id}) -> do
               ajaxHelper
                 "/rpc/set_current_speaker"
                 POST
-                { id: s.id }
+                { id: id }
                 200
                 "SpeakerQueue.Next -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           pure next
         Eject next -> do
-          state <- H.get
-          let (SpeakerQueue sq) = state.speakerQueue
-          case preview (_Speakers <<< _Speaking) state.speakerQueue of
+          {speakerQueue} <- H.get
+          case preview (_Speakers <<< _Speaking) speakerQueue of
             Nothing            -> pure unit
-            Just (S.Speaker s) -> do
+            Just (S.Speaker {id}) -> do
               ajaxHelper
-                ("/speaker?id=eq." <> show s.id)
+                ("/speaker?id=eq." <> show id)
                 PATCH
                 { state: "done" }
                 204
@@ -217,19 +211,8 @@ component =
             204
             "SpeakerQueue.Delete -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           pure next
-        GotNewState s next -> case s.keyboardMsg of
-          Nothing   -> H.put s *> pure next
-          Just kmsg -> case kmsg of 
-            NextSpeaker       -> H.put (s { keyboardMsg = Nothing }) *> eval (H.action Next)  *> pure next
-            EjectSpeaker      -> H.put (s { keyboardMsg = Nothing }) *> eval (H.action Eject) *> pure next
-            AddSpeakerToQueue -> H.put (s { keyboardMsg = Nothing }) *> H.query unit (H.action (F.SubmitForm myEvent)) *> pure next
-            _                 -> pure next
-
-
-
-  -- = NextSpeaker
-  -- | EjectSpeaker
-  -- | AddSpeakerToQueue
+        GotNewState s next ->
+          H.put s *> pure next
 
 ajaxHelper
   :: forall r
@@ -241,10 +224,10 @@ ajaxHelper
   -> String
   -> H.ParentDSL State Query F.Query Unit Message Aff Unit
 ajaxHelper partialUrl method dta code msg = do
-  state <- H.get
+  {token} <- H.get
   r <- H.liftAff $ PG.emptyResponse
           (createURL partialUrl)
-          state.token
+          token
           method
           dta
   if r.status == StatusCode code
