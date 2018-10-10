@@ -10,3 +10,4 @@ frontend/main.js
 static/main.js
 static/bundle.css
 *.retry
+.psc-ide-port
