@@ -302,7 +302,7 @@ component =
         handleSpeakerQueue
           :: F { id             :: Int
                , agenda_item_id :: Int
-               , state          :: String
+               , state          :: SQ.SpeakerQueueState
                }
           -> WSAction
           -> State
@@ -315,6 +315,6 @@ component =
           where
             go Insert {id, state} ai = Just $ AG.pushSQ (SQ.SpeakerQueue {id, state, speakers: mempty}) ai
             go Update {id, state} ai =
-              if state == "done"
-                then AG.popSQIfMatchingId id ai
-                else Nothing
+              case state of
+                SQ.Done -> AG.popSQIfMatchingId id ai
+                _       -> Nothing

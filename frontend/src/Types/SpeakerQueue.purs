@@ -6,12 +6,14 @@ module Types.SpeakerQueue
   , _Speakers
   ) where
 
+import Control.Monad.Except (throwError)
 import Data.Array (filter, index, sort)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', Prism', lens, over, prism')
 import Data.Maybe (Maybe(Nothing, Just))
 import Data.Newtype (class Newtype)
-import Prelude (class Eq, class Ord, class Show, compare, identity, pure, show, (&&), (/=), (<#>), (<>), (>>=), (>>>))
+import Foreign (ForeignError(..))
+import Prelude (class Eq, class Ord, class Show, compare, identity, pure, show, ($), (&&), (/=), (<#>), (<>), (>>=), (>>>))
 import Simple.JSON (class ReadForeign, readImpl)
 import Test.QuickCheck (class Arbitrary)
 import Test.QuickCheck.Arbitrary (genericArbitrary)
@@ -23,9 +25,30 @@ data SpeakerQueueState
   | Active
   | Done
 
+derive instance eqSQS  :: Eq      SpeakerQueueState
+derive instance genSQS :: Generic SpeakerQueueState _
+
+instance arbSQS :: Arbitrary SpeakerQueueState where
+  arbitrary = genericArbitrary
+
+instance shSQS :: Show SpeakerQueueState where
+  show = case _ of
+           Init    -> "init"
+           Active  -> "active"
+           Done    -> "done"
+
+instance rfSQS :: ReadForeign SpeakerQueueState where
+  readImpl fr
+    =   readImpl fr
+    >>= case _ of
+          "init"    -> pure Init
+          "active"  -> pure Active
+          "done"    -> pure Done
+          e         -> throwError $ pure $ ForeignError $ "This is not a SpeakerQueueState: " <> e
+
 type SpeakerQueueRecord =
   { id       :: Int
-  , state    :: String
+  , state    :: SpeakerQueueState
   , speakers :: Array Speaker
   }
 newtype SpeakerQueue = SpeakerQueue SpeakerQueueRecord
