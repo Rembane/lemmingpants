@@ -1,6 +1,7 @@
 module Types.SpeakerQueue
   ( SpeakerQueue(..)
   , SpeakerQueueRecord
+  , SpeakerQueueState(..)
   , _Speaking
   , _Speakers
   ) where
@@ -60,7 +61,7 @@ _Speakers =
     (\(SpeakerQueue {speakers}) -> speakers)
     (\(SpeakerQueue r) s' ->
       let f = filter
-                (\(Speaker s) -> s.state /= S.Done && s.state /= S.Deleted)
+                (\(Speaker {state}) -> state /= S.Done && state /= S.Deleted)
               >>> sort
        in SpeakerQueue r { speakers = f s' })
 
@@ -70,8 +71,8 @@ _Speaking
   = prism'
       (pure)
       (\a -> index a 0
-        >>= \s@(Speaker s') ->
-                case s'.state of
+        >>= \s@(Speaker {state}) ->
+                case state of
                   S.Active -> Just s
                   _        -> Nothing
       )

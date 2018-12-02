@@ -9,7 +9,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (maybe)
 import Data.Newtype (class Newtype)
 import Foreign (ForeignError(..))
-import Prelude (class Eq, class Ord, class Show, compare, pure, show, ($), (<>), (>>=))
+import Prelude (class Eq, class Ord, class Show, Ordering(..), compare, pure, show, ($), (<>), (>>=))
 import Simple.JSON (class ReadForeign, readImpl)
 import Test.QuickCheck (class Arbitrary)
 import Test.QuickCheck.Arbitrary (genericArbitrary)
@@ -63,7 +63,16 @@ instance shSp :: Show Speaker where
 
 instance ordSp :: Ord Speaker where
   compare (Speaker s1) (Speaker s2) =
-    compare s1.timesSpoken s2.timesSpoken <> compare s1.id s2.id
+    stateOrdering s1.state s2.state
+      <> compare s1.timesSpoken s2.timesSpoken
+      <> compare s1.id s2.id
+    where
+      stateOrdering :: SpeakerState -> SpeakerState -> Ordering
+      stateOrdering Active Active = EQ
+      stateOrdering _      Active = GT
+      stateOrdering Active _      = LT
+      stateOrdering _      _      = EQ
+
 
 visualizeSpeaker :: AttendeeDB -> Speaker -> String
 visualizeSpeaker db (Speaker s) =
