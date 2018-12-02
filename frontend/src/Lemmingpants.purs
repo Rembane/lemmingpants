@@ -297,8 +297,7 @@ component =
             go Update r = set (SQ._Speakers <<< _withId r.id) (newSpeaker r)
 
             newSpeaker {id, attendee_id, state, times_spoken} =
-              let ts = fromMaybe 0 times_spoken
-               in S.Speaker { id, attendeeId: attendee_id, state, timesSpoken: ts }
+              S.Speaker { id, attendeeId: attendee_id, state, timesSpoken: fromMaybe 0 times_spoken }
 
         handleSpeakerQueue
           :: F { id             :: Int
