@@ -3,7 +3,7 @@ module Components.Overhead where
 import Data.Array as A
 import Data.Either (Either(Right, Left))
 import Data.Lens (preview, view)
-import Data.Maybe (Maybe(..), maybe, maybe')
+import Data.Maybe (maybe, maybe')
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -33,17 +33,16 @@ component =
     }
   where
     render :: State -> H.ComponentHTML Query
-    render state =
-      case currentAI of
-        Left  e                   ->
-          HH.text e
-        Right ai@(AgendaItem ai') ->
+    render {agenda, attendees} =
+      case AG.getCurrentAI agenda of
+        Left e ->
+          HH.div_ [HH.text e]
+        Right ai@(AgendaItem {supertitle, title}) ->
           HH.div_
-            (case ai'.supertitle of
-              Nothing -> [ HH.h1 [HP.id_ "with-ruler"] [HH.text ai'.title] ]
-              Just st -> [ HH.h1 [HP.id_ "with-ruler"] [HH.text st]
-                         , HH.h1_                     [HH.text ai'.title]
-                         ]
+            ((maybe
+               [HH.h1 [HP.id_ "with-ruler"] [HH.text title]]
+               (\t ->  [HH.h1_ [HH.text t], HH.h2 [HP.id_ "with-ruler"] [HH.text title]])
+               supertitle)
             <>
             [ maybe'
                 (\_ -> HH.p_ [HH.text "ERROR: No speakerqueue found!"])
@@ -51,19 +50,16 @@ component =
                   HH.div_
                   [ HH.p_
                     [ HH.strong_ [HH.text "Speaking: "]
-                    , HH.text (maybe "–" (S.visualizeSpeaker state.attendees) (preview (_Speakers <<< _Speaking) sq))
+                    , HH.text (maybe "–" (S.visualizeSpeaker attendees) (preview (_Speakers <<< _Speaking) sq))
                     ]
                   , HH.ol_
                     (A.fromFoldable (map
-                      (\s -> HH.li_ [HH.text (S.visualizeSpeaker state.attendees s) ])
-                      (A.dropWhile (\(S.Speaker s) -> s.state == S.Active) $ view _Speakers sq)))
+                      (\s -> HH.li_ [HH.text (S.visualizeSpeaker attendees s) ])
+                      (A.dropWhile (\(S.Speaker {state}) -> state == S.Active) $ view _Speakers sq)))
                   ]
                 )
                 (AG.topSQ ai)
             ])
-
-      where
-        currentAI = AG.getCurrentAI state.agenda
 
     eval :: Query ~> H.ComponentDSL State Query Void m
     eval =

@@ -4,11 +4,11 @@ import Prelude
 
 import Affjax.StatusCode (StatusCode(..))
 import Components.SpeakerQueue as SQ
-import Data.Either (Either(..), either, note)
+import Data.Either (Either(..), note)
 import Data.Function.Uncurried (Fn1, runFn1)
 import Data.HTTP.Method (Method(..))
 import Data.List as L
-import Data.Maybe (Maybe(Nothing, Just))
+import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Traversable (sequence)
 import Effect (Effect)
 import Effect.Aff (Aff)
@@ -70,39 +70,44 @@ component =
     }
   where
     render :: State -> H.ParentHTML Query SQ.Query Unit Aff
-    render state =
-      if pl.role == "admin_user"
+    render {agenda, attendees, token} =
+      if role == "admin_user"
         then
-          HH.div_
-            ([ HH.h1
-              [HP.class_ (HH.ClassName "clearfix")]
-              [ HH.button
-                [ HE.onClick (HE.input_ PreviousAI), HP.id_ "prev-button" ]
-                [ HH.text "⇐" ]
-              , HH.text (either identity (\(AgendaItem a) -> a.title) currentAI)
-              , HH.button
-                [ HE.onClick (HE.input_ NextAI), HP.id_ "next-button" ]
-                [ HH.text "⇒" ]
-              ]
-            ] <> either
-                (const [HH.text "No agenda item => no speaker queue."])
-                (\ai@(AgendaItem {id, speakerQueues}) ->
-                  [ case AG.topSQ ai of
-                      Nothing -> HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
-                      Just sq ->
-                        HH.slot
-                          unit
-                          SQ.component
-                          { speakerQueue: sq
-                          , token:        state.token
-                          , attendees:    state.attendees
-                          , agendaItemId: id
-                          , sqHeight:     L.length speakerQueues
-                          }
-                          (HE.input SQMsg)
-                  ])
-                currentAI
-            )
+          case AG.getCurrentAI agenda of
+            Left e ->
+              HH.div_ [HH.text e]
+            Right ai@(AgendaItem {id, speakerQueues, title, supertitle}) ->
+              HH.div_
+                [ HH.div
+                   [HP.id_ "agenda-item-buttons"]
+                   [ HH.button
+                      [ HE.onClick (HE.input_ PreviousAI), HP.id_ "prev-button" ]
+                      [ HH.text "⇐" ]
+                   , HH.div
+                       [ HP.id_ "ai-headings" ]
+                       (maybe
+                         [HH.h1_ [HH.text title]]
+                         (\t ->  [HH.h1_ [HH.text t], HH.h2_ [HH.text title]])
+                         supertitle)
+                   , HH.button
+                     [ HE.onClick (HE.input_ NextAI), HP.id_ "next-button" ]
+                     [ HH.text "⇒" ]
+                   ]
+                 , case AG.topSQ ai of
+                     Nothing ->
+                       HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
+                     Just sq ->
+                       HH.slot
+                         unit
+                         SQ.component
+                         { speakerQueue: sq
+                         , token:        token
+                         , attendees:    attendees
+                         , agendaItemId: id
+                         , sqHeight:     L.length speakerQueues
+                         }
+                         (HE.input SQMsg)
+                 ]
         else
           HH.div_
             [ HH.p_
@@ -114,8 +119,7 @@ component =
               ]
             ]
       where
-        currentAI    = AG.getCurrentAI state.agenda
-        (Payload pl) = let (Token t) = state.token in t.payload
+        (Payload {role}) = let (Token {payload}) = token in payload
 
     eval :: Query ~> H.ParentDSL State Query SQ.Query Unit Message Aff
     eval =

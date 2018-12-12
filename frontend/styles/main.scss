@@ -80,7 +80,7 @@ nav {
     display: none;
   }
 
-  h1#with-ruler {
+  h1#with-ruler, h2#with-ruler {
     border-bottom: $base-border;
   }
 
@@ -94,16 +94,25 @@ nav {
 
 /* Admin */
 #admin {
+  #agenda-item-buttons {
+    @include grid-container;
+    @include grid-collapse;
+  }
+
+  #ai-headings {
+    @include grid-column(8);
+  }
+
   h1, h2 {
     text-align: center;
   }
 
   #prev-button {
-    float: left;
+    @include grid-column(2);
   }
 
   #next-button {
-    float: right;
+    @include grid-column(2);
   }
 
   #speakerhandling-container {
@@ -144,9 +153,4 @@ nav {
       width: 100%;
     }
   }
-}
-
-/* Utils */
-.clearfix {
-  @include clearfix;
 }
