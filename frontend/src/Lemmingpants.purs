@@ -118,15 +118,15 @@ component =
       }
 
     render :: State -> H.ParentHTML Query ChildQuery ChildSlot Aff
-    render state =
+    render state@{currentLocation, flash, token} =
       HH.div
-        [ HP.id_ (toLower (show state.currentLocation)) ]
+        [ HP.id_ (toLower (show currentLocation)) ]
         [ HH.nav_
           [ HH.menu_ (
             [ HH.li_ [HH.a [HP.href "#"]             [HH.text "Home"]]
             , HH.li_ [HH.a [HP.href "#registration"] [HH.text "Registration"]]
             , HH.li_ [HH.a [HP.href "#overhead"]     [HH.text "Overhead"]]
-            ] <> (if pl.role == "admin_user"
+            ] <> (if role == "admin_user"
                    then [ HH.li_
                       [ HH.a [HP.href "#admin"] [HH.text "Admin"]
                       , HH.menu
@@ -139,11 +139,20 @@ component =
           ]
         , HH.div
           [HP.class_ (HH.ClassName "container")]
-          (maybe [] (\(FL.Flash f) -> [ HH.div [ HP.id_ "flash", (HP.class_ (HH.ClassName (show f.typ))) ] [ HH.text f.msg ] ]) state.flash
-            <> [locationToSlot state.currentLocation state])
+          (maybe
+            []
+            (\(FL.Flash {typ, msg}) ->
+              [ HH.div
+                [ HP.id_ "flash"
+                , HP.class_ (HH.ClassName (show typ))
+                ]
+                [ HH.text msg ]
+              ])
+            flash
+            <> [locationToSlot currentLocation state])
         ]
       where
-        (Payload pl) = let (Token t) = state.token in t.payload
+        (Payload {role}) = let (Token {payload}) = token in payload
 
         loginlogoutlink
           :: State

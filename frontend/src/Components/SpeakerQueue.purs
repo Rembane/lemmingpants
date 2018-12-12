@@ -10,8 +10,8 @@ import Data.Either (Either(Right, Left))
 import Data.HTTP.Method (Method(..))
 import Data.Lens (filtered, preview, traversed, view)
 import Data.Maybe (Maybe(Just, Nothing), fromJust, maybe)
-import Debug.Trace (traceM)
 import Effect.Aff (Aff)
+import Effect.Console (log)
 import Foreign (MultipleErrors)
 import Foreign.Object as FO
 import Halogen as H
@@ -59,14 +59,18 @@ component =
 
   where
     render :: State -> H.ParentHTML Query F.Query Unit Aff
-    render state =
+    render {attendees, speakerQueue, sqHeight} =
       HH.div
         [ HP.id_ "speakerhandling-container" ]
         [ HH.div
           [ HP.id_ "speaker-col" ]
           [ HH.p_
             [ HH.strong_ [ HH.text "Speaking: " ]
-            , HH.text (maybe "–" (S.visualizeSpeaker state.attendees) (preview (_Speakers <<< _Speaking) state.speakerQueue))
+            , HH.text
+                (maybe
+                  "–"
+                  (S.visualizeSpeaker attendees)
+                  (preview (_Speakers <<< _Speaking) speakerQueue))
             ]
           , HH.table
               [ HP.id_ "attendee-table" ]
@@ -74,40 +78,40 @@ component =
                 [ HH.tr_
                   [ HH.th
                       [ HP.class_ (HH.ClassName "id") ]
-                      [ HH.text "ID"]
-                  , HH.th [ HP.id_ "name"      ] [ HH.text "Name"]
+                      [ HH.text "ID" ]
+                  , HH.th [ HP.id_ "name" ] [ HH.text "Name" ]
                   , HH.th
                       [ HP.class_ (HH.ClassName "numspoken")
                       , HP.title ("Number of times spoken")
                       ]
-                      [ HH.text "#"]
-                  , HH.th [ HP.id_ "delcol"    ] [ HH.text " "]
+                      [ HH.text "#" ]
+                  , HH.th [ HP.id_ "delcol" ] [ HH.text " " ]
                   ]
                 ]
               ] <>
               (A.fromFoldable (map
-                (\s@(S.Speaker s') ->
+                (\s@(S.Speaker {attendeeId, id, timesSpoken}) ->
                   HH.tr_
                     [ HH.td
                       [ HP.class_ (HH.ClassName "id") ]
-                      [ HH.text (show s'.attendeeId) ]
-                    , HH.td_ [ HH.text (S.visualizeSpeaker state.attendees s) ]
+                      [ HH.text (show attendeeId) ]
+                    , HH.td_ [ HH.text (S.visualizeSpeaker attendees s) ]
                     , HH.td
                         [ HP.class_ (HH.ClassName "numspoken") ]
-                        [ HH.text (show s'.timesSpoken) ]
-                    , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete s'.id)) ] [ HH.text "X" ] ]
+                        [ HH.text (show timesSpoken) ]
+                    , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete id)) ] [ HH.text "X" ] ]
                     ])
-                (A.dropWhile (\(S.Speaker s) -> s.state == S.Active) $ view _Speakers state.speakerQueue))))
+                (A.dropWhile (\(S.Speaker {state}) -> state == S.Active) $ view _Speakers speakerQueue))))
           ]
         , HH.div
             [ HP.id_ "speaker-button-col" ]
-            [ HH.p_ [ HH.text ("Stack height: " <> show state.sqHeight) ]
+            [ HH.p_ [ HH.text ("Stack height: " <> show sqHeight) ]
             , HH.ul_
               [ HH.li_ [ HH.button [ HE.onClick (HE.input_ PushSQ) ] [ HH.text "Push speakerqueue" ] ]
               , HH.li_
                 [ HH.button
                   [ HE.onClick (HE.input_ PopSQ)
-                  , if state.sqHeight <= 1
+                  , if sqHeight <= 1
                       then HP.disabled true
                       else HP.disabled false
                   ]
@@ -122,7 +126,13 @@ component =
             , HH.slot
                 unit
                 (F.component "Add speaker"
-                  [ mkField "id" "Speaker ID" [HP.type_ HP.InputNumber, HP.required true, HP.autocomplete false, HP.id_ "id"] ]
+                  [ mkField "id" "Speaker ID"
+                    [HP.type_ HP.InputNumber
+                    , HP.required true
+                    , HP.autocomplete false
+                    , HP.id_ "id"
+                    ]
+                  ]
                 )
                 unit
                 (HE.input FormMsg)
@@ -158,7 +168,7 @@ component =
           case m of
             F.FormSubmitted m' ->
               case readJSON (unsafePartial (fromJust (FO.lookup "id" m'))) :: Either MultipleErrors Int of
-                Left es -> traceM es
+                Left es -> H.liftEffect $ log $ show es
                 Right n -> do
                   case getAttendeeByNumber n state.attendees of
                     Nothing           ->
