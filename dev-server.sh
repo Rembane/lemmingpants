@@ -13,14 +13,15 @@ export PGRST_DB_POOL=10
 export PGRST_SERVER_HOST="*4"
 export PGRST_SERVER_PORT=3000
 export PGRST_JWT_SECRET="feBU1ykZ4icKs2nKam9l8CD84qhgeOl6QQakrUJBiRTUu4dKTLVoH8o"
-export PGRST_WS_ROOT="./static"
-export PGRST_WS_LISTEN="postgres-websockets-listener"
+
+export PGWS_DB_URI=$PGRST_DB_URI
+export PGWS_HOST=127.0.0.1
+export PGWS_PORT=8000
+export PGWS_ROOT_PATH="./static"
+export PGWS_LISTEN_CHANNEL="postgres-websockets-listener"
+export PGWS_JWT_SECRET=$PGRST_JWT_SECRET
 
 postgrest lemmingpants.conf &
-
-{
-    export PGRST_SERVER_PORT=8000
-    postgres-websockets lemmingpants.conf &
-}
+postgres-websockets lemmingpants.conf &
 
 wait
