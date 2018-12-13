@@ -74,7 +74,7 @@ component =
             ]
           , HH.table
               [ HP.id_ "attendee-table" ]
-              ([ HH.thead_
+              [ HH.thead_
                 [ HH.tr_
                   [ HH.th
                       [ HP.class_ (HH.ClassName "id") ]
@@ -88,20 +88,24 @@ component =
                   , HH.th [ HP.id_ "delcol" ] [ HH.text " " ]
                   ]
                 ]
-              ] <>
-              (A.fromFoldable (map
-                (\s@(S.Speaker {attendeeId, id, timesSpoken}) ->
-                  HH.tr_
-                    [ HH.td
-                      [ HP.class_ (HH.ClassName "id") ]
-                      [ HH.text (show attendeeId) ]
-                    , HH.td_ [ HH.text (S.visualizeSpeaker attendees s) ]
-                    , HH.td
-                        [ HP.class_ (HH.ClassName "numspoken") ]
-                        [ HH.text (show timesSpoken) ]
-                    , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete id)) ] [ HH.text "X" ] ]
-                    ])
-                (A.dropWhile (\(S.Speaker {state}) -> state == S.Active) $ view _Speakers speakerQueue))))
+              , HH.tbody_
+                (A.fromFoldable (map
+                  (\s@(S.Speaker {attendeeId, id, timesSpoken}) ->
+                    HH.tr_
+                      [ HH.td
+                        [ HP.class_ (HH.ClassName "id") ]
+                        [ HH.text (show attendeeId) ]
+                      , HH.td_
+                        [ HH.text (S.visualizeSpeaker attendees s)
+                        , HH.div [ HP.class_ $ HH.ClassName "newCircle" ] []
+                        ]
+                      , HH.td
+                          [ HP.class_ (HH.ClassName "numspoken") ]
+                          [ HH.text (show timesSpoken) ]
+                      , HH.td_ [ HH.button [ HE.onClick (HE.input_ (Delete id)) ] [ HH.text "X" ] ]
+                      ])
+                  (A.dropWhile (\(S.Speaker {state}) -> state == S.Active) $ view _Speakers speakerQueue)))
+              ]
           ]
         , HH.div
             [ HP.id_ "speaker-button-col" ]
