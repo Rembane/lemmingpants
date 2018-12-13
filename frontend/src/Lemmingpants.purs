@@ -212,11 +212,11 @@ component =
               s <- H.modify (_ {token = t})
               H.liftAff (TT.saveToken s.window t)
               pure next
-            CL.Flash s -> flash s next
+            CL.Flash s -> flash (Just s) next
         RegistrationMsg m next ->
           case m of
             CR.FrmVsbl b -> H.modify (\s -> s { showRegForm = b }) *> pure next
-            CR.Flash   s -> flash s next
+            CR.Flash   s -> flash (Just s) next
         WSMsg fr next -> do
           -- Log the message to the console.
           liftEffect $ log $ unsafeFromForeign fr
@@ -229,11 +229,11 @@ component =
           --
           -- Regards, A.
           case runExcept (dispatcher state =<< readJSON' =<< readString fr) of
-            Left  es -> flash (FL.mkFlash (foldMap renderForeignError es) FL.Error) next
+            Left  es -> flash (Just (FL.mkFlash (foldMap renderForeignError es) FL.Error)) next
             Right s' -> H.put s' *> pure next
       where
         flash s next =
-          H.modify (_ {flash = Just s})
+          H.modify (_ {flash = s})
           *> pure next
 
         dispatcher

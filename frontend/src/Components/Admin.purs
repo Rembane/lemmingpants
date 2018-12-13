@@ -56,7 +56,7 @@ data Query a
 derive instance functorQuery :: Functor Query
 
 data Message
-  = Flash FL.Flash
+  = Flash (Maybe FL.Flash)
 
 component :: H.Component HH.HTML Query Input Message Aff
 component =
@@ -135,9 +135,9 @@ component =
             (pure <<< map (const ES.Listening))
           pure next
         PreviousAI next ->
-           step AG.prev *> pure next
+          H.raise (Flash Nothing) *> step AG.prev *> pure next
         NextAI next ->
-          step AG.next *> pure next
+          H.raise (Flash Nothing) *> step AG.next *> pure next
         SQMsg (SQ.Flash m) next ->
           H.raise (Flash m) *> pure next
         GotNewState s next ->
@@ -167,7 +167,7 @@ component =
     setCurrentAgendaItem mai =
       case mai of
         Left s ->
-          H.raise $ Flash $ FL.mkFlash s FL.Error
+          H.raise $ Flash $ Just $ FL.mkFlash s FL.Error
         Right (AgendaItem c) -> do
           s <- H.get
           r <- H.liftAff (PG.emptyResponse
@@ -179,7 +179,7 @@ component =
             StatusCode 200 ->
               pure unit
             _ ->
-              H.raise $ Flash $
+              H.raise $ Flash $ Just $
                 FL.mkFlash
                   "setCurrentAgendaItem -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
                   FL.Error

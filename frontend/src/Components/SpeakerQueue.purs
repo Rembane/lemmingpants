@@ -46,7 +46,7 @@ data Query a
   | GotNewState State     a
 
 data Message
-  = Flash FL.Flash
+  = Flash (Maybe FL.Flash)
 
 component :: H.Component HH.HTML Query State Message Aff
 component =
@@ -143,6 +143,7 @@ component =
     eval =
       case _ of
         PushSQ next -> do
+          H.raise (Flash Nothing)
           state <- H.get
           ajaxHelper
             "/speaker_queue"
@@ -153,6 +154,7 @@ component =
             "PushSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           *> pure next
         PopSQ next -> do
+          H.raise (Flash Nothing)
           state <- H.get
           let (SpeakerQueue sq) = state.speakerQueue
           ajaxHelper
@@ -164,6 +166,7 @@ component =
           *> pure next
         FormMsg m next -> do
           state <- H.get
+          H.raise (Flash Nothing)
           let (SpeakerQueue sq) = state.speakerQueue
           case m of
             F.FormSubmitted m' ->
@@ -172,7 +175,7 @@ component =
                 Right n -> do
                   case getAttendeeByNumber n state.attendees of
                     Nothing           ->
-                      H.raise $ Flash $ FL.mkFlash ("Couldn't find attendee with number: " <> show n) FL.Error
+                      H.raise $ Flash $ Just $ FL.mkFlash ("Couldn't find attendee with number: " <> show n) FL.Error
                     Just (Attendee a) -> do
                       r <- H.liftAff $ PG.emptyResponse
                         (createURL "/speaker")
@@ -185,11 +188,12 @@ component =
                         StatusCode 201 -> -- The `Created` HTTP status code.
                           H.query unit (H.action F.ClearForm) *> pure unit
                         StatusCode 409 -> -- We can only have a visible speaker once per speaker queue.
-                          H.raise $ Flash $ FL.mkFlash "I'm sorry, but you cannot add a speaker while it still is in the speaker queue." FL.Error
+                          H.raise $ Flash $ Just $ FL.mkFlash "I'm sorry, but you cannot add a speaker while it still is in the speaker queue." FL.Error
                         _ ->
-                          H.raise $ Flash $ FL.mkFlash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
-          *> pure next
+                          H.raise $ Flash $ Just $ FL.mkFlash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
+          pure next
         Next next -> do
+          H.raise (Flash Nothing)
           {speakerQueue} <- H.get
           case preview (_Speakers <<< traversed <<< filtered (\(S.Speaker {state}) -> state /= S.Active)) speakerQueue of
             Nothing               -> pure unit
@@ -202,6 +206,7 @@ component =
                 "SpeakerQueue.Next -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           pure next
         Eject next -> do
+          H.raise (Flash Nothing)
           {speakerQueue} <- H.get
           case preview (_Speakers <<< _Speaking) speakerQueue of
             Nothing            -> pure unit
@@ -214,6 +219,7 @@ component =
                 "SpeakerQueue.Eject -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           pure next
         Delete id_ next -> do
+          H.raise (Flash Nothing)
           ajaxHelper
             ("/speaker?id=eq." <> show id_)
             PATCH
@@ -242,4 +248,4 @@ ajaxHelper partialUrl method dta code msg = do
           dta
   if r.status == StatusCode code
     then pure unit
-    else H.raise $ Flash $ FL.mkFlash msg FL.Error
+    else H.raise $ Flash $ Just $ FL.mkFlash msg FL.Error
