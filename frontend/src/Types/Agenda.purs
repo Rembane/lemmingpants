@@ -21,9 +21,13 @@ import Data.Array as A
 import Data.Either (Either(..), note)
 import Data.Lens (Lens', element, lens, over, preview, traverseOf, traversed)
 import Data.List as L
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Map as M
+import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
 import Data.Newtype (class Newtype)
-import Prelude (class Eq, class Ord, class Show, compare, const, eq, otherwise, show, (&&), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>>>))
+import Data.Traversable (for, traverse)
+import Data.Tuple (Tuple(..))
+import Foreign (F, Foreign, readArray)
+import Prelude (class Eq, class Ord, class Show, compare, const, eq, otherwise, pure, show, (&&), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Record as R
 import Simple.JSON (class ReadForeign, readImpl)
 import Type.Prelude (SProxy(..))
@@ -32,12 +36,11 @@ import Types.Lens (_withId)
 ------------------------------------------------------------------------------
 -- | AgendaItem
 ------------------------------------------------------------------------------
-
 newtype AgendaItem = AgendaItem
   { id            :: Int
-  , supertitle    :: Maybe String
   , title         :: String
   , order_        :: Int
+  , parent        :: Maybe AgendaItem
   , state         :: String
   , speakerQueues :: L.List SpeakerQueue
   }
@@ -86,8 +89,50 @@ popSQIfMatchingId i ai
 ------------------------------------------------------------------------------
 data Agenda = Agenda Int (Array AgendaItem)
 
+type RawAgendaItem =
+  { id            :: Int
+  , title         :: String
+  , order_        :: Int
+  , parent        :: Maybe Int
+  , state         :: String
+  , speakerQueues :: Array SpeakerQueue
+  }
+
+getId :: Foreign -> F {id :: Int}
+getId = readImpl
+
+getParent :: Foreign -> F {parent :: Maybe Int}
+getParent = readImpl
+
 instance rfAg :: ReadForeign Agenda where
-  readImpl fr = Agenda 0 <$> readImpl fr
+  readImpl =
+    readArray
+      >=> traverse (\fr -> (\{parent} -> {parent, fr}) <$> getParent fr)
+      >=> (A.partition (\{parent} -> isNothing parent)
+        >>> \{yes, no} ->
+              let forest =
+                          (M.fromFoldableWith
+                            (<>)
+                            (A.mapMaybe
+                              (\{fr, parent} -> (\p -> Tuple p [fr]) <$> parent)
+                              no)) :: M.Map Int (Array Foreign)
+               in A.concat <$> for yes (\{fr} ->
+                 readImpl fr
+                   >>= (\parent@(AgendaItem {id}) ->
+                       maybe
+                         (pure [parent])
+                         (traverse (\x ->
+                             (readImpl x :: F RawAgendaItem)
+                               <#> R.set (SProxy :: SProxy "parent") (Just parent)
+                               >>> R.modify
+                                     (SProxy :: SProxy "speakerQueues")
+                                     (L.sort <<< (L.fromFoldable :: Array SpeakerQueue -> L.List SpeakerQueue))
+                               >>> AgendaItem
+                           )
+                         )
+                         (M.lookup id forest)
+                      )))
+      >=> (pure <<< Agenda 0)
 
 instance showAgenda :: Show Agenda where
   show (Agenda i xs) = "Agenda " <> show i <> "\n" <> show xs

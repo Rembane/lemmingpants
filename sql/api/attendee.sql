@@ -20,7 +20,7 @@ CREATE FUNCTION create_attendee(id INTEGER, cid TEXT, name TEXT, nick TEXT DEFAU
     SELECT attendee.id INTO aid FROM attendee WHERE attendee.cid = LOWER(create_attendee.cid);
     IF aid IS NULL THEN
         INSERT INTO attendee(cid, name, nick)
-        VALUES (LOWER(create_attendee.cid), create_attendee.name, create_attendee.nick)
+        VALUES (LOWER(create_attendee.cid), create_attendee.name, NULLIF(create_attendee.nick, ''))
         RETURNING attendee.id INTO aid;
     END IF;
     INSERT INTO attendee_number(id, attendee_id) VALUES (create_attendee.id, aid);
