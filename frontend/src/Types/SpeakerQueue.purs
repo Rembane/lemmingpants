@@ -88,7 +88,7 @@ _Speakers =
               >>> sort
        in SpeakerQueue r { speakers = f s' })
 
--- | A lens with focus on someone that is speaking.
+-- | An optic that focuses on someone speaking.
 _Speaking :: Prism' (Array Speaker) Speaker
 _Speaking
   = prism'

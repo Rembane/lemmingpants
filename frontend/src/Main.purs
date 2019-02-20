@@ -81,20 +81,18 @@ loadInitialState = do
     -- | Get a new token if the current token is too old.
     -- | Otherwise, make do with the one saved in local storage.
     loadOrGetNewToken :: Window -> Aff (Either MultipleErrors Token)
-    loadOrGetNewToken w = do
-      et <- loadToken w
-      case et of
-        Left  _ -> do
-          et' <- PG.requestAnonymousToken
-          case et' of
-            Left  l -> (pure <<< Left) l
-            Right r -> do
-              _ <- saveToken w r
-              (pure <<< pure) r
-        Right t@(Token t') ->
+    loadOrGetNewToken w =
+      loadToken w >>=
+      case _ of
+        Left  _ ->
+          PG.requestAnonymousToken >>=
+          either
+            (pure <<< Left)
+            (\r -> saveToken w r *> (pure <<< pure) r)
+        Right t@(Token {payload}) ->
           (liftEffect now) >>= \n ->
-            let (Payload p) = t'.payload
-                mexp        = instant (Milliseconds ((toNumber p.exp) * 1000.0))
+            let (Payload {exp}) = payload
+                mexp            = instant (Milliseconds ((toNumber exp) * 1000.0))
              in if maybe false (_ > n) mexp
                   then (pure <<< pure) t
                   else removeToken w *> loadOrGetNewToken w -- The recursion hack!

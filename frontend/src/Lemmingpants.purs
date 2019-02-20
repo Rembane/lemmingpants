@@ -3,7 +3,6 @@ module Lemmingpants where
 import Prelude
 
 import Components.Admin as CA
-import Components.Admin.ListAttendees as CAL
 import Components.Home as CH
 import Components.Login as CL
 import Components.Overhead as CO
@@ -13,10 +12,10 @@ import Control.Bind (bindFlipped)
 import Control.Monad.Except (except, runExcept)
 import Data.Array as A
 import Data.Either (Either(..), note)
-import Data.Either.Nested (Either6)
+import Data.Either.Nested (Either3)
 import Data.Foldable (foldMap)
-import Data.Functor.Coproduct.Nested (Coproduct6)
-import Data.Lens (over, set, traverseOf)
+import Data.Functor.Coproduct.Nested (Coproduct3)
+import Data.Lens (over, set, traverseOf, view)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
@@ -30,9 +29,10 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Routing.Match (Match, lit)
+import Routing.Match (Match, end, lit)
 import Simple.JSON (readImpl, readJSON')
 import Type.Prelude (SProxy(..))
+import Types.Agenda (_AgendaItems)
 import Types.Agenda as AG
 import Types.Attendee as AT
 import Types.Flash as FL
@@ -43,8 +43,8 @@ import Types.Token (Payload(..), Token(..))
 import Types.Token as TT
 import Web.HTML (Window)
 
-type ChildQuery = Coproduct6 CR.Query CO.Query CA.Query CAL.Query CL.Query CH.Query
-type ChildSlot  = Either6 Int Int Int Int Int Int
+type ChildQuery = Coproduct3 CR.Query CA.Query CL.Query
+type ChildSlot  = Either3 Int Int Int
 
 data WSAction
   = Insert
@@ -54,29 +54,25 @@ data Location
   = Home
   | Registration
   | Overhead
-  | Admin
-  | AdminListAttendees
+  | Admin CA.Location
   | Login
 
 instance shLoc :: Show Location where
   show
     = case _ of
-        Home               -> "Home"
-        Registration       -> "Registration"
-        Overhead           -> "Overhead"
-        Admin              -> "Admin"
-        AdminListAttendees -> "Admin: List attendees"
-        Login              -> "Login"
+        Home         -> "Home"
+        Registration -> "Registration"
+        Overhead     -> "Overhead"
+        Admin l      -> show l
+        Login        -> "Login"
 
 locations :: Match Location
 locations
-  =   (Registration       <$ lit "registration")
-  <|> (Overhead           <$ lit "overhead")
-  <|> (Admin              <$ lit "admin")
-  <|> (Admin              <$ lit "admin")
-  <|> (AdminListAttendees <$ lit "adminAttendees")
-  <|> (Login              <$ lit "login")
-  <|> (Home               <$ lit "")
+  =   (Registration <$  lit "registration" <* end)
+  <|> (Overhead     <$  lit "overhead"     <* end)
+  <|> (Admin        <$> (lit "admin" *> CA.locations))
+  <|> (Login        <$  lit "login" <* end)
+  <|> (Home         <$  end)
 
 type State =
   { currentLocation :: Location
@@ -119,7 +115,7 @@ component =
       }
 
     render :: State -> H.ParentHTML Query ChildQuery ChildSlot Aff
-    render state@{currentLocation, flash, token} =
+    render state@{agenda, attendees, currentLocation, flash, token} =
       HH.div
         [ HP.id_ (toLower (show currentLocation)) ]
         [ HH.nav_
@@ -132,7 +128,8 @@ component =
                       [ HH.a [HP.href "#admin"] [HH.text "Admin"]
                       , HH.menu
                         [ HP.id_ "submenu" ]
-                        [ HH.li_ [ HH.a [HP.href "#adminAttendees"] [HH.text "List attendees"] ] ]
+                        [ HH.li_ [ HH.a [HP.href "#admin/attendees"] [HH.text "List attendees"] ]
+                        , HH.li_ [ HH.a [HP.href "#admin/agenda"] [HH.text "Manage agenda"] ] ]
                       ]
                     ]
                     else mempty)
@@ -150,7 +147,18 @@ component =
                 [ HH.text msg ]
               ])
             flash
-            <> [locationToSlot currentLocation state])
+            <> [ case currentLocation of
+                   Registration ->
+                     HH.slot' CP.cp1 1 CR.component { token: state.token, showForm: state.showRegForm } (HE.input RegistrationMsg)
+                   Admin location ->
+                     HH.slot' CP.cp2 2 CA.component { token, agenda, attendees, location } (HE.input AdminMsg)
+                   Login ->
+                     HH.slot' CP.cp3 3 CL.component { token } (HE.input LoginMsg)
+                   Home ->
+                     CH.render
+                   Overhead ->
+                     CO.render { agenda, attendees }
+               ])
         ]
       where
         (Payload {role}) = let (Token {payload}) = token in payload
@@ -160,40 +168,12 @@ component =
           -> H.ParentHTML Query ChildQuery ChildSlot Aff
         loginlogoutlink s =
           let (TT.Token {payload}) = s.token
-              (TT.Payload p)       = payload
-           in if p.role == "admin_user"
+              (TT.Payload {role})  = payload
+           in if role == "admin_user"
                 -- Blergh... hack... blergh...
                 -- TODO: Unhack this!
                 then HH.li_ [HH.a [HP.href "#signout", HE.onClick (HE.input_ SignOut)] [HH.text "Sign out"]]
                 else HH.li_ [HH.a [HP.href "#login"]   [HH.text "Login"]]
-
-        locationToSlot
-          :: Location
-          -> State
-          -> H.ParentHTML Query ChildQuery ChildSlot Aff
-        locationToSlot l s =
-          case l of
-            Registration       -> go CP.cp1 1 CR.component  rs   (HE.input RegistrationMsg)
-            Overhead           -> go CP.cp2 2 CO.component  ohs  (const Nothing)
-            Admin              -> go CP.cp3 3 CA.component  s'   (HE.input AdminMsg)
-            AdminListAttendees -> go CP.cp4 4 CAL.component alas (const Nothing)
-            Login              -> go CP.cp5 5 CL.component  ls   (HE.input LoginMsg)
-            Home               -> go CP.cp6 6 CH.component  unit (const Nothing)
-          where
-            go :: forall g i o
-               . CP.ChildPath g ChildQuery Int ChildSlot
-              -> Int
-              -> H.Component HH.HTML g i o Aff
-              -> i
-              -> (o -> Maybe (Query Unit))
-              -> H.ParentHTML Query ChildQuery ChildSlot Aff
-            go cp p c i f = HH.slot' cp p c i f
-
-            ls   = { token: s.token }
-            rs   = { token: s.token, showForm: s.showRegForm }
-            s'   = { token: s.token, agenda: s.agenda, attendees: s.attendees }
-            ohs  = { agenda: s.agenda, attendees: s.attendees }
-            alas = { attendees: s.attendees }
 
     eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void Aff
     eval =
@@ -201,8 +181,9 @@ component =
         ChangePage l next ->
           H.modify (_ {currentLocation = l, flash = Nothing, showRegForm = true}) *> pure next
         SignOut      next -> do
-          s <- H.get
-          H.liftAff (TT.removeToken s.window)
+          {window} <- H.get
+          H.liftAff (TT.removeToken window)
+          eval (H.action (ChangePage Home))
           pure next
         AdminMsg   m next ->
           case m of
@@ -241,16 +222,16 @@ component =
           :: State
           -> { channel :: String, event :: String, payload :: Foreign }
           -> F State
-        dispatcher state r =
-          case r.event of
-            "agenda_item_insert"   -> handleAgendaItem   Insert state (readImpl r.payload)
-            "agenda_item_update"   -> handleAgendaItem   Update state (readImpl r.payload)
-            "attendee_insert"      -> handleAttendee            state (readImpl r.payload)
-            "attendee_update"      -> handleAttendee            state (readImpl r.payload)
-            "speaker_insert"       -> handleSpeaker      Insert state (readImpl r.payload)
-            "speaker_update"       -> handleSpeaker      Update state (readImpl r.payload)
-            "speaker_queue_insert" -> handleSpeakerQueue Insert state (readImpl r.payload)
-            "speaker_queue_update" -> handleSpeakerQueue Update state (readImpl r.payload)
+        dispatcher state {event, payload} =
+          case event of
+            "agenda_item_insert"   -> handleAgendaItem   Insert state (readImpl payload)
+            "agenda_item_update"   -> handleAgendaItem   Update state (readImpl payload)
+            "attendee_insert"      -> handleAttendee            state (readImpl payload)
+            "attendee_update"      -> handleAttendee            state (readImpl payload)
+            "speaker_insert"       -> handleSpeaker      Insert state (readImpl payload)
+            "speaker_update"       -> handleSpeaker      Update state (readImpl payload)
+            "speaker_queue_insert" -> handleSpeakerQueue Insert state (readImpl payload)
+            "speaker_queue_update" -> handleSpeakerQueue Update state (readImpl payload)
             _                      -> fail (ForeignError "Anything can happen.")
 
         errorHandler :: forall a. String -> Maybe a -> F a
@@ -260,16 +241,23 @@ component =
         handleAgendaItem
           :: WSAction
           -> State
-          -> F { id         :: Int
-               , supertitle :: Maybe String
-               , title      :: String
-               , order_     :: Int
-               , state      :: String
+          -> F { id     :: Int
+               , title  :: String
+               , order_ :: Int
+               , parent :: Maybe Int
+               , state  :: String
                }
           -> F State
         handleAgendaItem action st =
-          bindFlipped (\{ id, supertitle, title, order_, state } ->
-            let newAI = AG.AgendaItem { id, supertitle, title, order_, state, speakerQueues: mempty }
+          bindFlipped (\{ id, title, order_, parent, state } ->
+            -- Take great care to find the parent and add it as a parent to
+            -- the newly created agenda item.
+            let newAI = AG.AgendaItem { id, title, order_, state
+                                      , parent: parent >>= \p ->
+                                                 A.find
+                                                  (\(AG.AgendaItem {id}) -> id == p)
+                                                  (view _AgendaItems st.agenda)
+                                      , speakerQueues: mempty }
              in case action of
                   Insert -> pure (AG.insert newAI st.agenda)
                   Update -> errorHandler "ERROR: handleAgendaItem: Could not update AgendaItem!"

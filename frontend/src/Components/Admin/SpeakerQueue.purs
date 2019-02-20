@@ -1,27 +1,23 @@
-module Components.SpeakerQueue where
+module Components.Admin.SpeakerQueue where
 
 import Prelude
 
 import Affjax.StatusCode (StatusCode(..))
-import Components.Forms as F
-import Components.Forms.Field (mkField)
 import Data.Array as A
-import Data.Either (Either(Right, Left))
 import Data.HTTP.Method (Method(..))
 import Data.Lens (filtered, preview, traversed, view)
-import Data.Maybe (Maybe(Just, Nothing), fromJust, maybe)
+import Data.Maybe (Maybe(Just, Nothing), maybe)
+import Data.Newtype (class Newtype)
 import Effect.Aff (Aff)
-import Effect.Console (log)
-import Foreign (MultipleErrors)
-import Foreign.Object as FO
+import FormHelpers (FieldError, fieldScaffolding, isInt, isNonEmpty)
+import Formless as F
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Partial.Unsafe (unsafePartial)
 import Postgrest (createURL)
 import Postgrest as PG
-import Simple.JSON (class WriteForeign, readJSON)
+import Simple.JSON (class WriteForeign)
 import Types.Attendee (Attendee(..), AttendeeDB, getAttendeeByNumber)
 import Types.Flash as FL
 import Types.Speaker as S
@@ -37,16 +33,23 @@ type State =
   }
 
 data Query a
-  = PushSQ                a
-  | PopSQ                 a
-  | FormMsg     F.Message a
-  | Next                  a
-  | Eject                 a
-  | Delete      Int       a
-  | GotNewState State     a
+  = PushSQ                     a
+  | PopSQ                      a
+  | Formless (F.Message' Form) a
+  | Next                       a
+  | Eject                      a
+  | Delete      Int            a
+  | GotNewState State          a
+
+type ChildQuery = F.Query' Form Aff
 
 data Message
   = Flash (Maybe FL.Flash)
+
+newtype Form r f = Form (r
+  ( id   :: f FieldError String Int
+  ))
+derive instance newtypeForm :: Newtype (Form r f) _
 
 component :: H.Component HH.HTML Query State Message Aff
 component =
@@ -58,7 +61,7 @@ component =
     }
 
   where
-    render :: State -> H.ParentHTML Query F.Query Unit Aff
+    render :: State -> H.ParentHTML Query ChildQuery Unit Aff
     render {attendees, speakerQueue, sqHeight} =
       HH.div
         [ HP.id_ "speakerhandling-container" ]
@@ -129,73 +132,99 @@ component =
               ]
             , HH.slot
                 unit
-                (F.component "Add speaker"
-                  [ mkField "id" "Speaker ID"
-                    [HP.type_ HP.InputNumber
-                    , HP.required true
-                    , HP.autocomplete false
-                    , HP.id_ "id"
-                    ]
-                  ]
-                )
-                unit
-                (HE.input FormMsg)
+                F.component
+                  { initialInputs, validators, render: renderFormless }
+                  (HE.input Formless)
             ]
         ]
+      where
+        proxy = F.FormProxy :: F.FormProxy Form
 
-    eval :: Query ~> H.ParentDSL State Query F.Query Unit Message Aff
+        initialInputs :: Form Record F.InputField
+        initialInputs = F.mkInputFields proxy
+
+        validators :: Form Record (F.Validation Form Aff)
+        validators = Form
+          { id: isInt <<< isNonEmpty }
+
+        renderFormless :: F.State Form Aff -> F.HTML' Form Aff
+        renderFormless s =
+          HH.form
+            [ HE.onSubmit (HE.input_ F.submit) ]
+            [ fieldScaffolding "Speaker ID"
+              [ HH.input
+                [ HP.value $ F.getInput r.id s.form
+                , HE.onValueInput $ HE.input $ F.setValidate r.id
+                , HP.type_ HP.InputNumber
+                , HP.required true
+                , HP.autocomplete false
+                , HP.id_ "id"
+                ]
+              ]
+            , HH.p_
+              [ HH.input
+                [ HP.type_ HP.InputSubmit
+                , HP.value "Add speaker"
+                ]
+              ]
+            ]
+          where
+            r = F.mkSProxies proxy
+
+    eval :: Query ~> H.ParentDSL State Query ChildQuery Unit Message Aff
     eval =
       case _ of
-        PushSQ next -> do
+        PushSQ next ->
           H.raise (Flash Nothing)
-          state <- H.get
-          ajaxHelper
-            "/speaker_queue"
-            POST
-            { agenda_item_id: state.agendaItemId
-            , state:          "active" }
-            201
-            "PushSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          *> H.get >>= \{agendaItemId} ->
+            ajaxHelper
+              "/speaker_queue"
+              POST
+              { agenda_item_id: agendaItemId
+              , state:          "active" }
+              201
+              "PushSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           *> pure next
-        PopSQ next -> do
+        PopSQ next ->
           H.raise (Flash Nothing)
-          state <- H.get
-          let (SpeakerQueue sq) = state.speakerQueue
-          ajaxHelper
-            ("/speaker_queue?id=eq." <> show sq.id)
-            PATCH
-            { state: "done" }
-            204
-            "PopSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          *> H.get >>= \{speakerQueue} ->
+            let (SpeakerQueue {id}) = speakerQueue
+             in ajaxHelper
+                  ("/speaker_queue?id=eq." <> show id)
+                  PATCH
+                  { state: "done" }
+                  204
+                  "PopSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
           *> pure next
-        FormMsg m next -> do
-          state <- H.get
+        Formless m next ->
           H.raise (Flash Nothing)
-          let (SpeakerQueue sq) = state.speakerQueue
-          case m of
-            F.FormSubmitted m' ->
-              case readJSON (unsafePartial (fromJust (FO.lookup "id" m'))) :: Either MultipleErrors Int of
-                Left es -> H.liftEffect $ log $ show es
-                Right n -> do
-                  case getAttendeeByNumber n state.attendees of
-                    Nothing           ->
-                      H.raise $ Flash $ Just $ FL.mkFlash ("Couldn't find attendee with number: " <> show n) FL.Error
-                    Just (Attendee a) -> do
-                      r <- H.liftAff $ PG.emptyResponse
-                        (createURL "/speaker")
-                        state.token
-                        POST
-                        { speaker_queue_id: sq.id
-                        , attendee_id:      a.id
-                        }
-                      case r.status of
+          *> H.get
+          >>= \({attendees, speakerQueue, token}) ->
+            case m of
+              F.Submitted formOutput -> do
+                let form = F.unwrapOutputFields formOutput
+                case getAttendeeByNumber form.id attendees of
+                  Nothing           ->
+                    H.raise $ Flash $ Just $ FL.mkFlash ("Couldn't find attendee with number: " <> show form.id) FL.Error
+                  Just (Attendee a) ->
+                    H.liftAff (PG.emptyResponse
+                      (createURL "/speaker")
+                      token
+                      POST
+                      { speaker_queue_id: let (SpeakerQueue {id}) = speakerQueue in id
+                      , attendee_id:      a.id
+                      })
+                    >>= \{status} ->
+                      case status of
                         StatusCode 201 -> -- The `Created` HTTP status code.
-                          H.query unit (H.action F.ClearForm) *> pure unit
+                          H.query unit (H.action F.resetAll) $> unit
                         StatusCode 409 -> -- We can only have a visible speaker once per speaker queue.
                           H.raise $ Flash $ Just $ FL.mkFlash "I'm sorry, but you cannot add a speaker while it still is in the speaker queue." FL.Error
                         _ ->
                           H.raise $ Flash $ Just $ FL.mkFlash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
-          pure next
+                pure next
+              _ -> pure next
+          *> pure next
         Next next -> do
           H.raise (Flash Nothing)
           {speakerQueue} <- H.get
@@ -213,7 +242,7 @@ component =
           H.raise (Flash Nothing)
           {speakerQueue} <- H.get
           case preview (_Speakers <<< _Speaking) speakerQueue of
-            Nothing            -> pure unit
+            Nothing               -> pure unit
             Just (S.Speaker {id}) -> do
               ajaxHelper
                 ("/speaker?id=eq." <> show id)
@@ -242,14 +271,14 @@ ajaxHelper
   -> r
   -> Int
   -> String
-  -> H.ParentDSL State Query F.Query Unit Message Aff Unit
+  -> H.ParentDSL State Query ChildQuery Unit Message Aff Unit
 ajaxHelper partialUrl method dta code msg = do
   {token} <- H.get
-  r <- H.liftAff $ PG.emptyResponse
+  {status} <- H.liftAff $ PG.emptyResponse
           (createURL partialUrl)
           token
           method
           dta
-  if r.status == StatusCode code
+  if status == StatusCode code
     then pure unit
     else H.raise $ Flash $ Just $ FL.mkFlash msg FL.Error

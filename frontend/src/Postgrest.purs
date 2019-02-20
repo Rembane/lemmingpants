@@ -5,13 +5,14 @@ module Postgrest
   , useToken
   , emptyResponse
   , requestAnonymousToken
+  , pgrequest
   ) where
 
 -- | Here we keep the functions to make our interactions with Postgrest a breeze.
 
 import Affjax as AX
-import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.RequestBody as Req
+import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat as Res
 import Data.Array as A
 import Data.Either (Either(..), either, note)
@@ -21,7 +22,7 @@ import Data.MediaType (MediaType(..))
 import Data.Monoid (mempty)
 import Effect.Aff (Aff)
 import Foreign (ForeignError(..), MultipleErrors)
-import Prelude (Unit, pure, ($), (<#>), (<>), (>>=), (>>>), (<<<))
+import Prelude (Unit, pure, ($), (<#>), (<<<), (<>), (>=>), (>>>))
 import Simple.JSON (class WriteForeign, readJSON, writeJSON)
 import Types.Token (Token(..), parseToken)
 
@@ -84,11 +85,8 @@ requestAnonymousToken =
   <#> \{body} ->
     either
       (Left <<< pure <<< ForeignError <<< Res.printResponseFormatError)
-      (\s -> pt s
-        >>= (A.head >>> note (pure (ForeignError "No first item in array found.")))
-        >>= \t -> parseToken t.token
+      ((readJSON :: String -> Either MultipleErrors (Array { token :: String }))
+        >=> (A.head >>> note (pure (ForeignError "No first item in array found.")))
+        >=> \{token} -> parseToken token
       )
       body
-  where
-    pt :: String -> Either MultipleErrors (Array { token :: String })
-    pt = readJSON

@@ -1,5 +1,3 @@
-\i test_setup.sql
-
 CREATE SCHEMA testing AUTHORIZATION lemmingpants;
 
 CREATE OR REPLACE FUNCTION testing.test_db_structure()
@@ -22,7 +20,7 @@ BEGIN
     RETURN NEXT has_view('api', 'agenda_item',
         'The view api.agenda_item should exist.');
     RETURN NEXT columns_are('api', 'agenda_item',
-        ARRAY['id', 'supertitle', 'title', 'order_', 'state']);
+        ARRAY['id', 'title', 'order_', 'state', 'parent']);
     RETURN NEXT has_function('api', 'set_current_agenda_item',
         ARRAY['integer']);
     RETURN NEXT function_privs_are('api', 'set_current_agenda_item',
@@ -45,10 +43,16 @@ BEGIN
     PREPARE active_plan AS SELECT 'active'::state;
     PREPARE done_plan AS SELECT 'done'::state;
 
-    INSERT INTO model.agenda_item(id, supertitle, title, order_, state)
-        VALUES(1, 'SUPER!', 'Just a title', 1, 'init');
-    INSERT INTO model.agenda_item(id, supertitle, title, order_, state)
-        VALUES(2, 'SUPER!', 'Just a title', 2, 'init');
+    -- Gotta clean the tables, otherwise the numbers won't match.
+    -- The sequences are not reset between the tests.
+    -- But truncating resets the sequences.
+    TRUNCATE TABLE model.agenda_item RESTART IDENTITY CASCADE;
+    TRUNCATE TABLE model.speaker_queue RESTART IDENTITY CASCADE;
+
+    INSERT INTO model.agenda_item(id, title, order_, state)
+        VALUES(1, 'SUPER!', 1, 'init');
+    INSERT INTO model.agenda_item(id, title, order_, state, parent)
+        VALUES(2, 'Just a title', 2, 'init', 1);
 
     RETURN NEXT row_eq('SELECT * FROM api.speaker_queue WHERE agenda_item_id=1',
         ROW(1, 1, 'init')::speaker_queue,

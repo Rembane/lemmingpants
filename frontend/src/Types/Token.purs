@@ -20,7 +20,7 @@ import Data.String (Pattern(..), split)
 import Effect.Aff (Aff)
 import Effect.Exception (Error)
 import Foreign (ForeignError(..), MultipleErrors)
-import Prelude (class Eq, class Show, Unit, pure, show, ($), (<#>), (<<<), (<>), (>>=), (>>>))
+import Prelude (class Eq, class Show, Unit, pure, show, ($), (<#>), (<<<), (<=<), (<>), (>>=), (>>>))
 import Simple.JSON (class ReadForeign, readJSON)
 import Web.HTML (Window)
 import Web.HTML.Window (localStorage)
@@ -82,4 +82,4 @@ loadToken w = liftEffect $ localStorage w >>=
     >>> except
 
 removeToken :: Window -> Aff Unit
-removeToken w = liftEffect $ localStorage w >>= removeItem tokenKey
+removeToken = liftEffect <<< (removeItem tokenKey <=< localStorage)
