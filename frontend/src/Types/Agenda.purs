@@ -27,7 +27,7 @@ import Data.Newtype (class Newtype)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Foreign (F, Foreign, readArray)
-import Prelude (class Eq, class Ord, class Show, compare, const, eq, otherwise, pure, show, (&&), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (class Eq, class Ord, class Show, compare, const, eq, map, otherwise, pure, show, (&&), (*>), (+), (-), (/=), (<#>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Record as R
 import Simple.JSON (class ReadForeign, readImpl)
 import Type.Prelude (SProxy(..))
@@ -121,7 +121,7 @@ instance rfAg :: ReadForeign Agenda where
                    >>= (\parent@(AgendaItem {id}) ->
                        maybe
                          (pure [parent])
-                         (traverse (\x ->
+                         (map (_ `A.snoc` parent) <<< traverse (\x ->
                              (readImpl x :: F RawAgendaItem)
                                <#> R.set (SProxy :: SProxy "parent") (Just parent)
                                >>> R.modify
@@ -132,7 +132,7 @@ instance rfAg :: ReadForeign Agenda where
                          )
                          (M.lookup id forest)
                       )))
-      >=> (pure <<< Agenda 0)
+      >=> (pure <<< Agenda 0 <<< A.sort)
 
 instance showAgenda :: Show Agenda where
   show (Agenda i xs) = "Agenda " <> show i <> "\n" <> show xs

@@ -139,7 +139,7 @@
     - name: Move the stack executable to path
       when: stack_binary.stat.exists == False
       copy:
-        src: /setup/stack-1.7.1-linux-x86_64/stack
+        src: /setup/stack-1.9.3-linux-x86_64/stack
         dest: /usr/local/bin
         remote_src: yes
         mode: 0755
@@ -153,12 +153,12 @@
     - name: Download Postgrest binary distribution
       when: postgrest_binary.stat.exists == False
       get_url:
-        url: https://github.com/PostgREST/postgrest/releases/download/v5.1.0/postgrest-v5.1.0-ubuntu.tar.xz
+        url: https://github.com/PostgREST/postgrest/releases/download/v5.2.0/postgrest-v5.2.0-ubuntu.tar.xz
         dest: /setup
     - name: Unpack postgrest binary to /usr/local/bin
       when: postgrest_binary.stat.exists == False
       unarchive:
-        src: /setup/postgrest-v5.1.0-ubuntu.tar.xz
+        src: /setup/postgrest-v5.2.0-ubuntu.tar.xz
         dest: /usr/local/bin
         remote_src: yes
 
@@ -171,9 +171,8 @@
     - name: Clone postgres-websockets repository
       when: pw_binary.stat.exists == False
       git:
-        repo: https://github.com/Rembane/postgres-websockets.git
+        repo: https://github.com/diogob/postgres-websockets.git
         dest: /setup/postgres-websockets
-        version: read-conf-from-env
     - name: Compile and install postgres-websockets
       when: pw_binary.stat.exists == False
       shell: stack install --local-bin-path /usr/local/bin
@@ -242,20 +241,6 @@
       shell: psql -d lemmingpants < init.sql
       args:
         chdir: /setup
-
-- name: Database tests
-  hosts: all
-  become: yes
-  become_user: postgres
-  tasks:
-    - name: Upload test files
-      copy:
-        src: pg_tests/
-        dest: /setup/pg_tests
-        follow: yes
-    - name: Run backend tests
-      make:
-        chdir: /setup/pg_tests
 
 - name: Upload configuration and other files...
   hosts: all

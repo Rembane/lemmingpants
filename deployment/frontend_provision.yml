@@ -38,9 +38,9 @@
     - name: Download psc-package tarball
       when: pp_binary.stat.exists == False
       get_url:
-        url: https://github.com/purescript/psc-package/releases/download/v0.4.2/linux64.tar.gz
+        url: https://github.com/purescript/psc-package/releases/download/v0.5.1/linux64.tar.gz
         dest: /setup
-        checksum: sha1:bdf25acc5b4397bd03fd1da024896c5f33af85ce
+        checksum: sha1:09e033708f412e25ff049e5a9de42438b4696a33
     - name: Unpack psc-package tarball
       when: pp_binary.stat.exists == False
       unarchive:
@@ -65,9 +65,9 @@
     - name: Download Purescript tarball.
       when: purs_binary.stat.exists == False
       get_url:
-        url: https://github.com/purescript/purescript/releases/download/v0.12.0/linux64.tar.gz
+        url: https://github.com/purescript/purescript/releases/download/v0.12.3/linux64.tar.gz
         dest: /setup
-        checksum: sha1:08d4839f2800a6fdb398ec45b7182eada112ea89
+        checksum: sha1:f0c9fae808ae27973de7c77519f87ae6e4837312
     - name: Unpack Purescript compiler
       when: purs_binary.stat.exists == False
       unarchive:

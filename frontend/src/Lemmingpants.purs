@@ -255,7 +255,7 @@ component =
             let newAI = AG.AgendaItem { id, title, order_, state
                                       , parent: parent >>= \p ->
                                                  A.find
-                                                  (\(AG.AgendaItem {id}) -> id == p)
+                                                  (\(AG.AgendaItem a) -> a.id == p)
                                                   (view _AgendaItems st.agenda)
                                       , speakerQueues: mempty }
              in case action of
