@@ -9,6 +9,7 @@ import Components.Login as CL
 import Components.Overhead as CO
 import Components.Registration as CR
 import Control.Alt ((<|>))
+import Control.Bind (bindFlipped)
 import Control.Monad.Except (except, runExcept)
 import Data.Array as A
 import Data.Either (Either(..), note)
@@ -242,88 +243,87 @@ component =
           -> F State
         dispatcher state r =
           case r.event of
-            "agenda_item_insert"   -> handleAgendaItem   (readImpl r.payload) Insert state
-            "agenda_item_update"   -> handleAgendaItem   (readImpl r.payload) Update state
-            "attendee_insert"      -> handleAttendee     (readImpl r.payload)        state
-            "attendee_update"      -> handleAttendee     (readImpl r.payload)        state
-            "speaker_insert"       -> handleSpeaker      (readImpl r.payload) Insert state
-            "speaker_update"       -> handleSpeaker      (readImpl r.payload) Update state
-            "speaker_queue_insert" -> handleSpeakerQueue (readImpl r.payload) Insert state
-            "speaker_queue_update" -> handleSpeakerQueue (readImpl r.payload) Update state
+            "agenda_item_insert"   -> handleAgendaItem   Insert state (readImpl r.payload)
+            "agenda_item_update"   -> handleAgendaItem   Update state (readImpl r.payload)
+            "attendee_insert"      -> handleAttendee            state (readImpl r.payload)
+            "attendee_update"      -> handleAttendee            state (readImpl r.payload)
+            "speaker_insert"       -> handleSpeaker      Insert state (readImpl r.payload)
+            "speaker_update"       -> handleSpeaker      Update state (readImpl r.payload)
+            "speaker_queue_insert" -> handleSpeakerQueue Insert state (readImpl r.payload)
+            "speaker_queue_update" -> handleSpeakerQueue Update state (readImpl r.payload)
             _                      -> fail (ForeignError "Anything can happen.")
+
+        errorHandler :: forall a. String -> Maybe a -> F a
+        errorHandler s = except <<< note (pure (ForeignError s))
 
         -- TODO: Make _ALL_ the go functions scream and shout if they can't update stuff.
         handleAgendaItem
-          :: F { id         :: Int
+          :: WSAction
+          -> State
+          -> F { id         :: Int
                , supertitle :: Maybe String
                , title      :: String
                , order_     :: Int
                , state      :: String
                }
-             -> WSAction
-             -> State
-             -> F State
-        handleAgendaItem fr action st =
-          fr
-            >>= \air -> go action air st.agenda
-            <#> \r   -> st { agenda = AG.jumpToFirstActive r }
-          where
-            go Insert air ag = pure (AG.insert (newAI air) ag)
-            go Update air ag =
-              except (note (pure (ForeignError "ERROR: handleAgendaItem: Could not update AgendaItem!"))
-                (traverseOf (AG._AgendaItems <<< _withId air.id) (\(AG.AgendaItem {speakerQueues}) ->
-                  Just $ set (_Newtype <<< prop (SProxy :: SProxy "speakerQueues")) speakerQueues (newAI air))
-                  ag))
+          -> F State
+        handleAgendaItem action st =
+          bindFlipped (\{ id, supertitle, title, order_, state } ->
+            let newAI = AG.AgendaItem { id, supertitle, title, order_, state, speakerQueues: mempty }
+             in case action of
+                  Insert -> pure (AG.insert newAI st.agenda)
+                  Update -> errorHandler "ERROR: handleAgendaItem: Could not update AgendaItem!"
+                    (traverseOf
+                      (AG._AgendaItems <<< _withId id)
+                      (\(AG.AgendaItem {speakerQueues}) ->
+                        Just $ set (_Newtype <<< prop (SProxy :: SProxy "speakerQueues")) speakerQueues newAI)
+                      st.agenda)
+          <#> \r -> st { agenda = AG.jumpToFirstActive r })
 
-            newAI { id, supertitle, title, order_, state } =
-              AG.AgendaItem { id, supertitle, title, order_, state, speakerQueues: mempty }
-
-        handleAttendee :: F AT.Attendee -> State -> F State
-        handleAttendee fr state =
-            fr <#> \at -> state { attendees = AT.insertAttendee at state.attendees }
+        handleAttendee :: State -> F AT.Attendee -> F State
+        handleAttendee state =
+            map \at -> state { attendees = AT.insertAttendee at state.attendees }
 
         handleSpeaker
-          :: F { id               :: Int
+          :: WSAction
+          -> State
+          -> F { id               :: Int
                , speaker_queue_id :: Int
                , attendee_id      :: Int
                , state            :: S.SpeakerState
                , times_spoken     :: Maybe Int
                , agenda_item_id   :: Int
                }
-             -> WSAction
-             -> State
-             -> F State
-        handleSpeaker fr action st =
-          fr >>= \r ->
-            except (note
-              (pure (ForeignError ("Modifying the speaker failed.")))
-              (traverseOf
-                (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId r.agenda_item_id <<< AG._SpeakerQueues <<< _withId r.speaker_queue_id)
-                (Just <<< go action r)
-                st))
-          where
-            go Insert r = over SQ._Speakers $ A.insert $ newSpeaker r
-            go Update r = set (SQ._Speakers <<< _withId r.id) (newSpeaker r)
-
-            newSpeaker {id, attendee_id, state, times_spoken} =
-              S.Speaker { id, attendeeId: attendee_id, state, timesSpoken: fromMaybe 0 times_spoken }
+          -> F State
+        handleSpeaker action st =
+          bindFlipped (\{ id, agenda_item_id, attendee_id, speaker_queue_id, state, times_spoken } ->
+            let newSpeaker = S.Speaker { id, attendeeId: attendee_id, state, timesSpoken: fromMaybe 0 times_spoken }
+             in errorHandler "Modifying the speaker failed."
+                  (traverseOf
+                    (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId agenda_item_id <<< AG._SpeakerQueues <<< _withId speaker_queue_id)
+                    (Just <<< case action of
+                              Insert -> over SQ._Speakers (A.insert newSpeaker)
+                              Update -> set (SQ._Speakers <<< _withId id) newSpeaker
+                    )
+                  st))
 
         handleSpeakerQueue
-          :: F { id             :: Int
+          :: WSAction
+          -> State
+          -> F { id             :: Int
                , agenda_item_id :: Int
                , state          :: SQ.SpeakerQueueState
                }
-          -> WSAction
-          -> State
           -> F State
-        handleSpeakerQueue r action s =
-          r >>= \{id, agenda_item_id, state} ->
-          except (note
-            (pure (ForeignError "Modifying the speaker queue failed."))
-            (traverseOf (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId agenda_item_id) (go action {id, state}) s))
-          where
-            go Insert {id, state} ai = Just $ AG.pushSQ (SQ.SpeakerQueue {id, state, speakers: mempty}) ai
-            go Update {id, state} ai =
-              case state of
-                SQ.Done -> AG.popSQIfMatchingId id ai
-                _       -> Nothing
+        handleSpeakerQueue action st =
+          bindFlipped (\{id, agenda_item_id, state} ->
+          errorHandler "Modifying the speaker queue failed."
+            (traverseOf
+              (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId agenda_item_id)
+              (case action of
+                 Insert -> Just <<< AG.pushSQ (SQ.SpeakerQueue {id, state, speakers: mempty})
+                 Update -> case state of
+                             SQ.Done -> AG.popSQIfMatchingId id
+                             _       -> const Nothing
+              )
+            st))
