@@ -11,3 +11,5 @@ static/main.js
 static/bundle.css
 *.retry
 .psc-ide-port
+*.tar*
+*.json
