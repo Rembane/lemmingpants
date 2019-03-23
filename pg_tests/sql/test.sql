@@ -198,7 +198,6 @@ BEGIN
 
     INSERT INTO model.agenda_item(title, order_) VALUES('THIS IS A TITLE', 1);
     PERFORM api.create_attendee(1, 'CID', 'name', 'witty nickname');
-    INSERT INTO model.speaker_queue(id, agenda_item_id) VALUES(1, 1);
     SELECT api.attendee.id INTO aid
         FROM api.attendee
         JOIN api.attendee_number

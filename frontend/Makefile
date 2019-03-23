@@ -1,8 +1,11 @@
 all: package
 
-.PHONY: dev compile package all styles clean test
+.PHONY: dev compile package all styles clean test start-anew
 
 DIRS = $(shell find output/ -name '*.js')
+
+start-anew: clean package
+	true
 
 package: compile
 	cat main.js | closure-compiler > main2.js
@@ -22,10 +25,12 @@ install-dependencies:
 	psc-package install
 	psc-package build
 
-test: install-dependencies
+build-tests: install-dependencies
 	@echo "Compiling..."
 	@psc-package build test/Main.purs
-	@purs bundle ${DIRS} -o test.js --main Test.Main -m Test.Main
+
+test: build-tests
+	@purs bundle ${DIRS} --output test.js --main Test.Main --module Test.Main
 	cat test.js | node
 
 clean:

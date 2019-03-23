@@ -7,6 +7,7 @@ bundle.js*
 */bower_components/*
 frontend/output/*
 frontend/main.js
+frontend/test.js
 static/main.js
 static/bundle.css
 *.retry
