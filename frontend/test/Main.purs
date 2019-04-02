@@ -16,6 +16,7 @@ import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (run)
 import Types.Agenda (empty, getCurrentAI, jumpToFirstActive)
 import Types.Speaker as S
+import Types.SpeakerQueue (SpeakerQueueState(..))
 import Types.SpeakerQueue as SQ
 
 isSuccessful :: Result -> Boolean
@@ -81,18 +82,18 @@ main = run [consoleReporter] do
     they "are sorted correctly" $ quickCheck speakersAreSortedCorrectly
   describe "SpeakerQueue" do
     it "has a _Speaking lens that will not let people sneak past the speaking speaker" $ do
-      let sq = SQ.SpeakerQueue { id :1, state: "active", speakers: [ firstSpeaker ]}
+      let sq = SQ.SpeakerQueue { id :1, state: Active, speakers: [ firstSpeaker ]}
           firstSpeaker  = S.Speaker { id: 1, attendeeId: 1, state: S.Active, timesSpoken: 2 }
           secondSpeaker = S.Speaker { id: 2, attendeeId: 2, state: S.Init, timesSpoken: 1 }
       shouldEqual
         ((over SQ._Speakers $ A.insert secondSpeaker) sq)
-        (SQ.SpeakerQueue { id :1, state: "active", speakers: [ firstSpeaker, secondSpeaker ]})
+        (SQ.SpeakerQueue { id :1, state: Active, speakers: [ firstSpeaker, secondSpeaker ]})
 
     it "has a _Speakers lens that respects the invariants" $ quickCheck theSpeakersLensRespectsInvariants
     it "has a ReadForeign that behaves well on no speakers." $ do
       shouldEqual
         (readJSON  """{"id":1,"state":"init","speakers":[]}""")
-        (Right $ SQ.SpeakerQueue {id: 1, state: "init", speakers: []})
+        (Right $ SQ.SpeakerQueue {id: 1, state: Init, speakers: []})
 
   where
     they = it
