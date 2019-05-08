@@ -93,15 +93,15 @@ component =
              , case AG.topSQ ai of
                  Nothing ->
                    HH.text "We have no speaker queues I'm afraid. This shouldn't happen. It happened anyway."
-                 Just sq ->
+                 Just speakerQueue ->
                    HH.slot
                      unit
                      SQ.component
-                     { speakerQueue: sq
-                     , token:        token
-                     , attendees:    attendees
+                     { speakerQueue
+                     , token
+                     , attendees
                      , agendaItemId: id
-                     , sqHeight:     L.length speakerQueues
+                     , sqHeight: L.length speakerQueues
                      }
                      (HE.input SQMsg)
              ]

@@ -74,7 +74,12 @@ component =
         then
           case location of
             MeetingManager ->
-              HH.slot' CP.cp1 unit CAM.component {agenda, token, attendees} (HE.input MeetingManagerMsg)
+              HH.slot'
+                CP.cp1
+                unit
+                CAM.component
+                {agenda, token, attendees}
+                (HE.input MeetingManagerMsg)
             ListAttendees ->
               CAL.render {attendees}
             ManageAgenda ->

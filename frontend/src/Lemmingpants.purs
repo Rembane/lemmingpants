@@ -92,7 +92,11 @@ data Query a
   | RegistrationMsg CR.Message a
   | WSMsg           Foreign    a
 
-type Input = { token :: TT.Token, agenda :: AG.Agenda, attendees :: AT.AttendeeDB, window :: Window }
+type Input = { token     :: TT.Token
+             , agenda    :: AG.Agenda
+             , attendees :: AT.AttendeeDB
+             , window    :: Window
+             }
 
 component :: H.Component HH.HTML Query Input Void Aff
 component =
@@ -149,9 +153,19 @@ component =
             flash
             <> [ case currentLocation of
                    Registration ->
-                     HH.slot' CP.cp1 1 CR.component { token: state.token, showForm: state.showRegForm } (HE.input RegistrationMsg)
+                     HH.slot'
+                       CP.cp1
+                       1
+                       CR.component
+                       { token: state.token, showForm: state.showRegForm }
+                       (HE.input RegistrationMsg)
                    Admin location ->
-                     HH.slot' CP.cp2 2 CA.component { token, agenda, attendees, location } (HE.input AdminMsg)
+                     HH.slot'
+                       CP.cp2
+                       2
+                       CA.component
+                       { token, agenda, attendees, location }
+                       (HE.input AdminMsg)
                    Login ->
                      HH.slot' CP.cp3 3 CL.component { token } (HE.input LoginMsg)
                    Home ->
@@ -255,7 +269,7 @@ component =
             let newAI = AG.AgendaItem { id, title, order_, state
                                       , parent: parent >>= \p ->
                                                  A.find
-                                                  (\(AG.AgendaItem {id}) -> id == p)
+                                                  (\(AG.AgendaItem a) -> a.id == p)
                                                   (view _AgendaItems st.agenda)
                                       , speakerQueues: mempty }
              in case action of
@@ -285,10 +299,19 @@ component =
           -> F State
         handleSpeaker action st =
           bindFlipped (\{ id, agenda_item_id, attendee_id, speaker_queue_id, state, times_spoken } ->
-            let newSpeaker = S.Speaker { id, attendeeId: attendee_id, state, timesSpoken: fromMaybe 0 times_spoken }
+            let newSpeaker = S.Speaker { id
+                                       , attendeeId: attendee_id
+                                       , state
+                                       , timesSpoken: fromMaybe 0 times_spoken
+                                       }
              in errorHandler "Modifying the speaker failed."
                   (traverseOf
-                    (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId agenda_item_id <<< AG._SpeakerQueues <<< _withId speaker_queue_id)
+                    (prop (SProxy :: SProxy "agenda")
+                      <<< AG._AgendaItems
+                      <<< _withId agenda_item_id
+                      <<< AG._SpeakerQueues
+                      <<< _withId speaker_queue_id
+                    )
                     (Just <<< case action of
                               Insert -> over SQ._Speakers (A.insert newSpeaker)
                               Update -> set (SQ._Speakers <<< _withId id) newSpeaker
