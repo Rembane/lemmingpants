@@ -5,13 +5,12 @@ import Prelude
 import Affjax.StatusCode (StatusCode(..))
 import Components.Admin.SpeakerQueue as SQ
 import Data.Either (Either(..), note)
-import Data.Function.Uncurried (Fn1, runFn1)
 import Data.HTTP.Method (Method(..))
 import Data.List as L
 import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Traversable (sequence)
-import Effect (Effect)
 import Effect.Aff (Aff)
+import FormHelpers (setFocus)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -30,11 +29,6 @@ import Web.HTML.HTMLDocument as HTMLDocument
 import Web.HTML.Window (document) as Web
 import Web.UIEvent.KeyboardEvent (fromEvent, key)
 import Web.UIEvent.KeyboardEvent.EventTypes as KET
-
-foreign import setFocusImpl :: Fn1 String (Effect Unit)
-
-setFocus :: String -> Effect Unit
-setFocus = runFn1 setFocusImpl
 
 type State =
   { agenda    :: Agenda
@@ -111,7 +105,7 @@ component =
       case _ of
         Init next -> do
           document <- H.liftEffect $ Web.document =<< Web.window
-          H.liftEffect $ setFocus "id"
+          focusId
           H.subscribe $ ES.eventSource
             (\f -> do
               el <- eventListener (f <<< H.action <<< HandleKey)
@@ -131,12 +125,14 @@ component =
           let p  = const (H.liftEffect $ preventDefault ev)
               go =
                 case _ of
-                  "n" -> p unit *> H.query unit (H.action SQ.Next)  *> pure next -- Next speaker
+                  "n" -> p unit *> H.query unit (H.action SQ.Next) *> pure next  -- Next speaker
                   "e" -> p unit *> H.query unit (H.action SQ.Eject) *> pure next -- Eject speaker
-                  "h" -> p unit *> step AG.prev *> pure next -- Previous agenda item
-                  "l" -> p unit *> step AG.next *> pure next -- Next agenda item
+                  "h" -> p unit *> eval (PreviousAI next) -- Previous agenda item
+                  "l" -> p unit *> eval (NextAI next)     -- Next agenda item
                   _   -> pure next
            in sequence (fromEvent ev <#> (key >>> go)) *> pure next
+
+    focusId = H.liftEffect (setFocus "id")
 
     step
       :: (Agenda -> Maybe Agenda)
@@ -144,7 +140,9 @@ component =
     step f =
       H.get
         >>= \{agenda} ->
-            setCurrentAgendaItem ((note "ERROR: Agenda: Out of bounds step." (f agenda)) >>= AG.getCurrentAI)
+            setCurrentAgendaItem
+              ((note "ERROR: Agenda: Out of bounds step." (f agenda)) >>= AG.getCurrentAI)
+        *> focusId
 
     setCurrentAgendaItem
       :: Either String AgendaItem

@@ -3,12 +3,19 @@ module FormHelpers where
 import Prelude
 
 import Data.Either (Either(..), note)
+import Data.Function.Uncurried (Fn1, runFn1)
 import Data.Int (fromString)
 import Data.List.Types (NonEmptyList)
 import Data.String (null)
+import Effect (Effect)
 import Foreign (ForeignError)
 import Formless as F
 import Halogen.HTML as HH
+
+foreign import setFocusImpl :: Fn1 String (Effect Unit)
+
+setFocus :: String -> Effect Unit
+setFocus = runFn1 setFocusImpl
 
 data FieldError
   = Required

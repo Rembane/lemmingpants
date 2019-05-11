@@ -9,7 +9,7 @@ import Data.Lens (filtered, preview, traversed, view)
 import Data.Maybe (Maybe(Just, Nothing), maybe)
 import Data.Newtype (class Newtype)
 import Effect.Aff (Aff)
-import FormHelpers (FieldError, fieldScaffolding, isInt, isNonEmpty)
+import FormHelpers (FieldError, fieldScaffolding, isInt, isNonEmpty, setFocus)
 import Formless as F
 import Halogen as H
 import Halogen.HTML as HH
@@ -185,6 +185,7 @@ component =
               , state:          "active" }
               201
               "PushSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          *> focusId
           *> pure next
         PopSQ next ->
           H.raise (Flash Nothing)
@@ -196,6 +197,7 @@ component =
                   { state: "done" }
                   204
                   "PopSQ -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          *> focusId
           *> pure next
         Formless m next ->
           H.raise (Flash Nothing)
@@ -225,6 +227,7 @@ component =
                           H.raise $ Flash $ Just $ FL.mkFlash "SpeakerQueue.FormMsg -- ERROR! Got a HTTP response we didn't expect! See the console for more information." FL.Error
                 pure next
               _ -> pure next
+          *> focusId
           *> pure next
         Next next -> do
           H.raise (Flash Nothing)
@@ -238,6 +241,7 @@ component =
                 { id: id }
                 200
                 "SpeakerQueue.Next -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          focusId
           pure next
         Eject next -> do
           H.raise (Flash Nothing)
@@ -251,6 +255,7 @@ component =
                 { state: "done" }
                 204
                 "SpeakerQueue.Eject -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          focusId
           pure next
         Delete id_ next -> do
           H.raise (Flash Nothing)
@@ -260,9 +265,12 @@ component =
             { state: "deleted" }
             204
             "SpeakerQueue.Delete -- ERROR! Got a HTTP response we didn't expect! See the console for more information."
+          focusId
           pure next
         GotNewState s next ->
           H.put s *> pure next
+
+    focusId = H.liftEffect (setFocus "id")
 
 ajaxHelper
   :: forall r
