@@ -94,14 +94,15 @@ component =
               , HH.tbody_
                 (A.fromFoldable (map
                   (\s@(S.Speaker {attendeeId, id, timesSpoken}) ->
-                    HH.tr_
-                      [ HH.td
+                    (let (SpeakerQueue {speakerAdded}) = speakerQueue
+                      in if Just s == speakerAdded
+                           then HH.tr [ HP.class_ $ HH.ClassName "speaker-added" ]
+                           else HH.tr_
+                    ) [ HH.td
                         [ HP.class_ (HH.ClassName "id") ]
                         [ HH.text (show attendeeId) ]
                       , HH.td_
-                        [ HH.text (S.visualizeSpeaker attendees s)
-                        , HH.div [ HP.class_ $ HH.ClassName "newCircle" ] []
-                        ]
+                        [ HH.text (S.visualizeSpeaker attendees s) ]
                       , HH.td
                           [ HP.class_ (HH.ClassName "numspoken") ]
                           [ HH.text (show timesSpoken) ]

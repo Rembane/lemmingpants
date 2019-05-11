@@ -47,9 +47,10 @@ instance rfSQS :: ReadForeign SpeakerQueueState where
           e         -> throwError $ pure $ ForeignError $ "This is not a SpeakerQueueState: " <> e
 
 type SpeakerQueueRecord =
-  { id       :: Int
-  , state    :: SpeakerQueueState
-  , speakers :: Array Speaker
+  { id           :: Int
+  , state        :: SpeakerQueueState
+  , speakers     :: Array Speaker
+  , speakerAdded :: Maybe Speaker
   }
 newtype SpeakerQueue = SpeakerQueue SpeakerQueueRecord
 derive instance ntSQ  :: Newtype SpeakerQueue _

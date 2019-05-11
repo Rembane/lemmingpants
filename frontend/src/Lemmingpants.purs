@@ -20,7 +20,9 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Data.String (toLower)
-import Effect.Aff (Aff)
+import Data.Time.Duration (Milliseconds(..))
+import Data.Tuple (Tuple(..))
+import Effect.Aff (Aff, delay)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign (F, Foreign, ForeignError(..), fail, readString, renderForeignError, unsafeFromForeign)
@@ -37,7 +39,9 @@ import Types.Agenda as AG
 import Types.Attendee as AT
 import Types.Flash as FL
 import Types.Lens (_withId)
+import Types.Speaker (Speaker)
 import Types.Speaker as S
+import Types.SpeakerQueue (SpeakerQueue)
 import Types.SpeakerQueue as SQ
 import Types.Token (Payload(..), Token(..))
 import Types.Token as TT
@@ -85,12 +89,13 @@ type State =
   }
 
 data Query a
-  = ChangePage      Location   a
-  | SignOut                    a
-  | AdminMsg        CA.Message a
-  | LoginMsg        CL.Message a
-  | RegistrationMsg CR.Message a
-  | WSMsg           Foreign    a
+  = ChangePage      Location         a
+  | SignOut                          a
+  | AdminMsg        CA.Message       a
+  | LoginMsg        CL.Message       a
+  | RegistrationMsg CR.Message       a
+  | WSMsg           Foreign          a
+  | UpdateState     (State -> State) a
 
 type Input = { token     :: TT.Token
              , agenda    :: AG.Agenda
@@ -226,7 +231,12 @@ component =
           -- Regards, A.
           case runExcept (dispatcher state =<< readJSON' =<< readString fr) of
             Left  es -> flash (Just (FL.mkFlash (foldMap renderForeignError es) FL.Error)) next
-            Right s' -> H.put s' *> pure next
+            Right (Tuple (Just f) s') ->
+              H.put s' *> H.liftAff (delay (Milliseconds 250.0)) *> eval (UpdateState f next)
+            Right (Tuple Nothing s') ->
+              H.put s' *> pure next
+        UpdateState f next ->
+          H.modify f *> pure next
       where
         flash s next =
           H.modify (_ {flash = s})
@@ -235,18 +245,27 @@ component =
         dispatcher
           :: State
           -> { channel :: String, event :: String, payload :: Foreign }
-          -> F State
+          -> F (Tuple (Maybe (State -> State)) State)
         dispatcher state {event, payload} =
           case event of
-            "agenda_item_insert"   -> handleAgendaItem   Insert state (readImpl payload)
-            "agenda_item_update"   -> handleAgendaItem   Update state (readImpl payload)
-            "attendee_insert"      -> handleAttendee            state (readImpl payload)
-            "attendee_update"      -> handleAttendee            state (readImpl payload)
-            "speaker_insert"       -> handleSpeaker      Insert state (readImpl payload)
-            "speaker_update"       -> handleSpeaker      Update state (readImpl payload)
-            "speaker_queue_insert" -> handleSpeakerQueue Insert state (readImpl payload)
-            "speaker_queue_update" -> handleSpeakerQueue Update state (readImpl payload)
-            _                      -> fail (ForeignError "Anything can happen.")
+            "agenda_item_insert" ->
+              Tuple Nothing <$> handleAgendaItem Insert state (readImpl payload)
+            "agenda_item_update" ->
+              Tuple Nothing <$> handleAgendaItem Update state (readImpl payload)
+            "attendee_insert" ->
+              Tuple Nothing <$> handleAttendee state (readImpl payload)
+            "attendee_update" ->
+              Tuple Nothing <$> handleAttendee state (readImpl payload)
+            "speaker_insert" ->
+              handleSpeaker Insert state (readImpl payload)
+            "speaker_update" ->
+              handleSpeaker Update state (readImpl payload)
+            "speaker_queue_insert" ->
+              Tuple Nothing <$> handleSpeakerQueue Insert state (readImpl payload)
+            "speaker_queue_update" ->
+              Tuple Nothing <$> handleSpeakerQueue Update state (readImpl payload)
+            _ ->
+              fail (ForeignError "Anything can happen.")
 
         errorHandler :: forall a. String -> Maybe a -> F a
         errorHandler s = except <<< note (pure (ForeignError s))
@@ -296,7 +315,7 @@ component =
                , times_spoken     :: Maybe Int
                , agenda_item_id   :: Int
                }
-          -> F State
+          -> F (Tuple (Maybe (State -> State)) State)
         handleSpeaker action st =
           bindFlipped (\{ id, agenda_item_id, attendee_id, speaker_queue_id, state, times_spoken } ->
             let newSpeaker = S.Speaker { id
@@ -304,19 +323,27 @@ component =
                                        , state
                                        , timesSpoken: fromMaybe 0 times_spoken
                                        }
-             in errorHandler "Modifying the speaker failed."
-                  (traverseOf
+
+                _speakerAdded :: (Maybe Speaker -> Maybe Speaker) -> SpeakerQueue -> SpeakerQueue
+                _speakerAdded = _Newtype <<< prop (SProxy :: SProxy "speakerAdded")
+
+                updateSQ :: (SpeakerQueue -> Maybe SpeakerQueue) -> State -> Maybe State
+                updateSQ = traverseOf
                     (prop (SProxy :: SProxy "agenda")
                       <<< AG._AgendaItems
                       <<< _withId agenda_item_id
                       <<< AG._SpeakerQueues
                       <<< _withId speaker_queue_id
                     )
-                    (Just <<< case action of
-                              Insert -> over SQ._Speakers (A.insert newSpeaker)
-                              Update -> set (SQ._Speakers <<< _withId id) newSpeaker
+             in errorHandler "Modifying the speaker failed."
+                  ((updateSQ
+                    (Just <<< (set _speakerAdded Nothing)
+                          <<< case action of
+                                Insert -> over SQ._Speakers (A.insert newSpeaker)
+                                Update -> set (SQ._Speakers <<< _withId id) newSpeaker
                     )
-                  st))
+                  st) <#> (Tuple (Just (\s -> fromMaybe s ((updateSQ (Just <<< set _speakerAdded (Just newSpeaker))) s))))
+                  ))
 
         handleSpeakerQueue
           :: WSAction
@@ -332,7 +359,14 @@ component =
             (traverseOf
               (prop (SProxy :: SProxy "agenda") <<< AG._AgendaItems <<< _withId agenda_item_id)
               (case action of
-                 Insert -> Just <<< AG.pushSQ (SQ.SpeakerQueue {id, state, speakers: mempty})
+                 Insert ->
+                   Just <<<
+                     AG.pushSQ (SQ.SpeakerQueue
+                                 { id
+                                 , state
+                                 , speakers: mempty
+                                 , speakerAdded: Nothing
+                                 })
                  Update -> case state of
                              SQ.Done -> AG.popSQIfMatchingId id
                              _       -> const Nothing

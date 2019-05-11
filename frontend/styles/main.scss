@@ -124,6 +124,19 @@ nav {
     @include grid-column(8);
 
     #attendee-table {
+      th {
+        text-align: center;
+      }
+
+      tr {
+        outline: transparent solid 3px;
+        transition: outline 1s linear 0s;
+
+        &.speaker-added {
+          outline: $action-color solid 3px;
+        }
+      }
+
       .id {
         width: 3ch;
         text-align: right;
@@ -136,12 +149,6 @@ nav {
 
       #delcol {
         width: 5em;
-      }
-
-      tbody > tr {
-        animation-duration: 3s;
-        animation-name: fadeout;
-        animation-fill-mode: forwards;
       }
     }
   }
@@ -158,15 +165,5 @@ nav {
       margin-bottom: 0.25em;
       width: 100%;
     }
-  }
-}
-
-@keyframes fadeout {
-  from {
-    outline: $action-color solid 3px;
-  }
-
-  to {
-    outline: $viewport-background-color solid 3px;
   }
 }
