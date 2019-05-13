@@ -78,6 +78,24 @@ BEGIN
 END;
 $$;
 
+-- Inserted and updated titles should not have leading or lagging whitespace.
+CREATE OR REPLACE FUNCTION testing.test_agenda_item_strips_whitespace()
+RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
+DECLARE
+    aid INTEGER;
+BEGIN
+    INSERT INTO api.agenda_item(title) VALUES(' No whitespace ') RETURNING api.agenda_item.id INTO aid;
+    RETURN NEXT row_eq('SELECT title FROM api.agenda_item WHERE id=' || aid :: TEXT,
+        ROW('No whitespace' :: TEXT),
+        'INSERT: The agenda title should not have any leading nor lagging whitespace.');
+    INSERT INTO api.agenda_item(title) VALUES('sklrgh') RETURNING api.agenda_item.id INTO aid;
+    UPDATE api.agenda_item SET title = ' skl rgh ' WHERE id=aid;
+    RETURN NEXT row_eq('SELECT title FROM api.agenda_item WHERE id=' || aid :: TEXT,
+        ROW('skl rgh' :: TEXT),
+        'UPDATE: The agenda title should not have any leading nor lagging whitespace.');
+END;
+$$;
+
 -- Attendees
 CREATE OR REPLACE FUNCTION testing.test_attendee_structure()
 RETURNS SETOF TEXT LANGUAGE plpgsql SET search_path = api, model, public AS $$
@@ -125,6 +143,12 @@ BEGIN
     RETURN NEXT results_eq('SELECT id FROM api.attendee_number WHERE attendee_id=1',
         Array[1, 2],
         'Exactly two attendee_numbers is created for our attendee.');
+    PERFORM api.create_attendee(3, ' whitespace_cid ', ' whitespace_name ',
+        ' whitespace_witty_nickname ');
+    RETURN NEXT row_eq(
+        'SELECT cid, name, nick FROM api.attendee INNER JOIN api.attendee_number ON api.attendee.id = api.attendee_number.attendee_id WHERE api.attendee_number.id = 3',
+        ROW('whitespace_cid' :: TEXT, 'whitespace_name' :: TEXT, 'whitespace_witty_nickname' :: TEXT),
+        'The attendee cid, name and nick should not have any leading nor lagging whitespace.');
 END;
 $$;
 
@@ -195,6 +219,12 @@ BEGIN
         'authorized_attendee', ARRAY['SELECT', 'INSERT']);
     RETURN NEXT column_privs_are('api', 'speaker', 'state',
         'admin_user', ARRAY['SELECT', 'UPDATE']);
+
+    -- Gotta clean the tables, otherwise the numbers won't match.
+    -- The sequences are not reset between the tests.
+    -- But truncating resets the sequences.
+    TRUNCATE TABLE model.agenda_item RESTART IDENTITY CASCADE;
+    TRUNCATE TABLE model.speaker_queue RESTART IDENTITY CASCADE;
 
     INSERT INTO model.agenda_item(title, order_) VALUES('THIS IS A TITLE', 1);
     PERFORM api.create_attendee(1, 'CID', 'name', 'witty nickname');

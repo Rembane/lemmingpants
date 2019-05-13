@@ -10,17 +10,20 @@ CREATE VIEW attendee_number AS
 
 GRANT SELECT ON attendee_number TO read_access;
 
-CREATE FUNCTION create_attendee(id INTEGER, cid TEXT, name TEXT, nick TEXT DEFAULT NULL) RETURNS api.jwt_token
+CREATE FUNCTION create_attendee(id INTEGER, cid TEXT, name TEXT, nick TEXT DEFAULT NULL)
+  RETURNS api.jwt_token
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = model, public, pg_temp
   AS $$
   DECLARE
     aid INTEGER;
+    cleaned_cid TEXT;
     result api.jwt_token;
   BEGIN
-    SELECT attendee.id INTO aid FROM attendee WHERE attendee.cid = LOWER(create_attendee.cid);
+    SELECT LOWER(TRIM(create_attendee.cid)) INTO cleaned_cid;
+    SELECT attendee.id INTO aid FROM attendee WHERE attendee.cid = cleaned_cid;
     IF aid IS NULL THEN
         INSERT INTO attendee(cid, name, nick)
-        VALUES (LOWER(create_attendee.cid), create_attendee.name, NULLIF(create_attendee.nick, ''))
+        VALUES (cleaned_cid, TRIM(create_attendee.name), TRIM(NULLIF(create_attendee.nick, '')))
         RETURNING attendee.id INTO aid;
     END IF;
     INSERT INTO attendee_number(id, attendee_id) VALUES (create_attendee.id, aid);
