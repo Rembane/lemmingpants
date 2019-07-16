@@ -10,6 +10,8 @@ $neat-grid: (
 
 body {
   margin: 0 0 ($base-spacing * 2);
+  background: black;
+  color: #fa6607;
 }
 
 .container {
@@ -20,7 +22,6 @@ body {
 
 /* Menu */
 nav {
-  background-color: #333;
   menu {
     @include margin(null auto 1em auto);
     @include padding(0.5em $base-spacing);
@@ -74,7 +75,7 @@ nav {
 
 /* Overhead */
 #overhead {
-  @include margin(3em null);
+  @include padding(3em null);
 
   nav {
     display: none;
